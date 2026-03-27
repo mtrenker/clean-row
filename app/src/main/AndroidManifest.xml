@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Internet permission for loading remote web pages -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Wake lock to keep screen on during workouts -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    
+    <!-- Access to serial port (no special permission needed, world-readable) -->
+
+    <application
+        android:allowBackup="false"
+        android:icon="@android:drawable/ic_menu_compass"
+        android:label="Clean Row"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:theme="@style/Theme.AppCompat.NoActionBar"
+        tools:targetApi="31">
+        
+        <!-- Main Activity with WebView -->
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Background service for serial communication -->
+        <service
+            android:name=".RowingService"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Receiver for physical button broadcasts -->
+        <receiver
+            android:name=".ButtonReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.cvte.sport.device.DISPLAY_BTN_SHORT_PRESSED" />
+                <action android:name="com.cvte.sport.device.DISPLAY_BTN_LONG_PRESSED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

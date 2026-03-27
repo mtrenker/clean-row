@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clean Row Test Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 3em;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+        
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+        }
+        
+        .stat-unit {
+            font-size: 0.5em;
+            opacity: 0.7;
+            margin-left: 5px;
+        }
+        
+        .controls {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            margin-bottom: 25px;
+        }
+        
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            outline: none;
+        }
+        
+        .range-value {
+            display: inline-block;
+            min-width: 50px;
+            text-align: center;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        
+        .status.connected {
+            background: rgba(76, 175, 80, 0.3);
+        }
+        
+        .status.disconnected {
+            background: rgba(244, 67, 54, 0.3);
+        }
+        
+        .color-picker-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        input[type="color"] {
+            width: 80px;
+            height: 50px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚣 Clean Row</h1>
+        
+        <div id="status" class="status">Connecting...</div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">RPM</div>
+                <div class="stat-value" id="rpm">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Power</div>
+                <div class="stat-value" id="watts">0<span class="stat-unit">W</span></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">SPM</div>
+                <div class="stat-value" id="spm">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Strokes</div>
+                <div class="stat-value" id="strokes">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Drag</div>
+                <div class="stat-value" id="drag">0</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <h2>Controls</h2>
+            
+            <div class="control-group">
+                <label>
+                    Drag Level: <span class="range-value" id="dragValue">12</span>
+                </label>
+                <input type="range" id="dragSlider" min="0" max="24" value="12">
+            </div>
+            
+            <div class="control-group">
+                <label>
+                    Target Watts: <span class="range-value" id="wattValue">100</span>W
+                </label>
+                <input type="range" id="wattSlider" min="0" max="500" step="10" value="100">
+            </div>
+            
+            <div class="control-group">
+                <label>LED Color</label>
+                <div class="color-picker-group">
+                    <input type="color" id="colorPicker" value="#00ff00">
+                    <button onclick="setLedColor()">Set Color</button>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>LED Presets</label>
+                <div class="button-group">
+                    <button onclick="setLedPreset(0)">Off</button>
+                    <button onclick="setLedPreset(1)">Blue</button>
+                    <button onclick="setLedPreset(2)">Cyan</button>
+                    <button onclick="setLedPreset(3)">Green</button>
+                    <button onclick="setLedPreset(4)">Yellow</button>
+                    <button onclick="setLedPreset(5)">Orange</button>
+                    <button onclick="setLedPreset(6)">Red</button>
+                    <button onclick="setLedPreset(7)">Purple</button>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="button-group">
+                    <button onclick="clearCounter()">Clear Counter</button>
+                    <button onclick="pauseWorkout()">Pause</button>
+                    <button onclick="resumeWorkout()">Resume</button>
+                    <button onclick="reloadPage()">Reload Page</button>
+                    <button onclick="closeApp()">Close App</button>
+                    <button onclick="restartApp()">Restart App</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="bridge.js"></script>
+    <script>
+        // Update UI when drag slider changes
+        document.getElementById('dragSlider').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('dragValue').textContent = value;
+        });
+        
+        document.getElementById('dragSlider').addEventListener('change', (e) => {
+            const value = parseInt(e.target.value);
+            sendCommand('setDrag', value);
+        });
+        
+        // Update UI when watt slider changes
+        document.getElementById('wattSlider').addEventListener('input', (e) => {
+            const value = e.target.value;
+            document.getElementById('wattValue').textContent = value;
+        });
+        
+        document.getElementById('wattSlider').addEventListener('change', (e) => {
+            const value = parseInt(e.target.value);
+            sendCommand('setWatt', value);
+        });
+        
+        function setLedColor() {
+            const color = document.getElementById('colorPicker').value;
+            const r = parseInt(color.substr(1, 2), 16);
+            const g = parseInt(color.substr(3, 2), 16);
+            const b = parseInt(color.substr(5, 2), 16);
+            
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'setLedRgb',
+                r: r,
+                g: g,
+                b: b
+            });
+        }
+        
+        function setLedPreset(preset) {
+            sendCommand('setLedPreset', preset);
+        }
+        
+        function clearCounter() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'clearCounter'
+            });
+        }
+        
+        function pauseWorkout() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'pause'
+            });
+        }
+        
+        function resumeWorkout() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'resume'
+            });
+        }
+
+        function reloadPage() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'reload'
+            });
+        }
+
+        function closeApp() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'closeApp'
+            });
+        }
+
+        function restartApp() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'restartApp'
+            });
+        }
+        
+        function sendCommand(action, value) {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: action,
+                value: value
+            });
+        }
+    </script>
+</body>
+</html>

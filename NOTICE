@@ -1,0 +1,12 @@
+Clean Row includes the following third-party components:
+
+---
+
+android-serialport-api Copyright 2009 Cedric Priscal
+
+Licensed under the Apache License, Version 2.0. Source:
+https://github.com/cepr/android-serialport-api
+
+The prebuilt JAR (app/libs/android-serialport-api.jar) and native libraries
+(app/src/main/jniLibs/*/libserial_port.so) are redistributed under the terms of
+the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0
