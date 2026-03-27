@@ -32,7 +32,7 @@ Once the JAR is in place:
 ## Install on Rowing Machine
 
 ```bash
-# Connect to your S-Row via WiFi debugging
+# Connect to your rowing machine via WiFi debugging
 adb connect <ROWING_MACHINE_IP>:<PORT>
 
 # Install
@@ -73,8 +73,8 @@ above.
 
 ### Can't connect via ADB
 
-Ensure wireless debugging is enabled on the S-Row. The connection port changes
-on reboot, so you may need to re-pair.
+Ensure wireless debugging is enabled on the rowing machine. The connection port
+changes on reboot, so you may need to re-pair.
 
 ### Web page doesn't load
 

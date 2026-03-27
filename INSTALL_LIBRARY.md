@@ -1,11 +1,12 @@
 # Installing the Serial Port Library
 
-## Quick Method: Extract from Sportstech APK
+## Quick Method: Extract from Vendor APK
 
-Since you've already decompiled the Sportstech APK, the easiest way is to extract their bundled serial library:
+Since you've already decompiled the vendor APK, the easiest way is to extract
+their bundled serial library:
 
 ```bash
-# Navigate to where you decompiled the Sportstech APK
+# Navigate to where you decompiled the vendor APK
 cd /tmp/stech2  # Or wherever you ran JADX
 
 # Find the library
@@ -37,7 +38,7 @@ cp android-serialport-api/build/libs/*.jar /home/martin/dev/clean-row/app/libs/a
 If you can't get android-serialport-api, you can use alternatives:
 
 1. **google/android-serialport-api** (older, but stable)
-2. **Build your own JNI wrapper** for `/dev/ttyS*` 
+2. **Build your own JNI wrapper** for `/dev/ttyS*`
 3. **Use termios via JNI** (raw POSIX serial access)
 
 If using an alternative, update the imports in `SerialInterface.kt`:

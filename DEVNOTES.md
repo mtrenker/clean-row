@@ -2,11 +2,14 @@
 
 ## Project Status: ✅ Complete
 
-All code has been implemented. The project is ready for building once the serial library is obtained.
+All code has been implemented. The project is ready for building once the serial
+library is obtained.
 
 ## Expected IDE Warnings
 
-You'll see "Unresolved reference" errors in VS Code for Android imports. This is **normal** - the Android SDK is not loaded in VS Code. The code will compile correctly when built with Gradle, which has access to the Android SDK.
+You'll see "Unresolved reference" errors in VS Code for Android imports. This is
+**normal** - the Android SDK is not loaded in VS Code. The code will compile
+correctly when built with Gradle, which has access to the Android SDK.
 
 ## Before Building
 
@@ -16,20 +19,21 @@ See [QUICKSTART.md](QUICKSTART.md) for instructions.
 
 ## Project Features
 
-✅ Complete Android Kotlin app  
-✅ Serial communication layer (`/dev/ttyS2` at 19200 baud)  
-✅ Packet parsing and protocol implementation  
-✅ WebView with remote URL loading  
-✅ JavaScript bridge (bidirectional window messaging)  
-✅ Background service for polling at 10Hz  
-✅ Physical button support  
-✅ LED control commands  
-✅ Example web UI with live data display  
-✅ Comprehensive documentation  
+✅ Complete Android Kotlin app\
+✅ Serial communication layer (`/dev/ttyS2` at 19200 baud)\
+✅ Packet parsing and protocol implementation\
+✅ WebView with remote URL loading\
+✅ JavaScript bridge (bidirectional window messaging)\
+✅ Background service for polling at 10Hz\
+✅ Physical button support\
+✅ LED control commands\
+✅ Example web UI with live data display\
+✅ Comprehensive documentation
 
 ## File Overview
 
 ### Core Kotlin Files
+
 - `MainActivity.kt` - WebView host, coordinates everything
 - `SerialInterface.kt` - Low-level serial port I/O
 - `RowingProtocol.kt` - Packet building and parsing
@@ -38,15 +42,18 @@ See [QUICKSTART.md](QUICKSTART.md) for instructions.
 - `ButtonReceiver.kt` - Physical button broadcast receiver
 
 ### Web Integration
+
 - `example-web/index.html` - Test UI with live stats
 - `example-web/bridge.js` - JavaScript client library
 
 ### Configuration
+
 - `AndroidManifest.xml` - Permissions and components
 - `network_security_config.xml` - Allow HTTP for dev
 - `strings.xml` - Default URL configuration
 
 ### Build System
+
 - `build.gradle.kts` (root + app) - Dependencies and build config
 - `settings.gradle.kts` - Project setup
 - `gradle.properties` - Gradle settings
@@ -55,6 +62,7 @@ See [QUICKSTART.md](QUICKSTART.md) for instructions.
 - `deploy.sh` - Build and install script
 
 ### Documentation
+
 - `README.md` - Full API documentation
 - `QUICKSTART.md` - Getting started guide
 - `app/libs/LIBRARY_NEEDED.md` - Serial library instructions
@@ -72,7 +80,7 @@ SerialInterface + Protocol
     ↕
 /dev/ttyS2 Hardware Serial
     ↕
-Sportstech S-Row (brake, sensors, LEDs)
+Rowing Machine (brake, sensors, LEDs)
 ```
 
 ## What Works
@@ -81,7 +89,7 @@ Sportstech S-Row (brake, sensors, LEDs)
 - ✅ Send commands from web UI (drag, watt target, LED colors)
 - ✅ Physical button integration (short/long press events)
 - ✅ Remote URL loading (develop web UI separately)
-- ✅ Full protocol implementation (all Sportstech commands)
+- ✅ Full protocol implementation (all rowing machine commands)
 - ✅ Connection status monitoring
 - ✅ Immersive fullscreen mode
 - ✅ Keep screen on during workouts
@@ -115,15 +123,16 @@ Once built and installed:
 
 1. **Get serial library** - See QUICKSTART.md
 2. **Build APK** - `./gradlew assembleDebug`
-3. **Connect to S-Row** - `adb connect <IP>:<PORT>`
+3. **Connect to Rowing Machine** - `adb connect <IP>:<PORT>`
 4. **Install** - `adb install app/build/outputs/apk/debug/app-debug.apk`
 5. **Run your web server** - Point to dev machine IP
-6. **Launch Clean Row app** - From S-Row launcher
+6. **Launch Clean Row app** - From rowing machine launcher
 7. **Build amazing rowing experiences!** 🚣‍♂️
 
 ## Customization
 
 Users can:
+
 - Change the default URL in `strings.xml`
 - Build any web UI (React, Vue, vanilla JS, etc.)
 - Use the provided JavaScript API

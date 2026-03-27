@@ -1,8 +1,8 @@
 # Clean Row 🚣
 
-A Kotlin Android app that bridges your Sportstech S-Row rowing machine's serial
-interface with web-based interfaces. Build custom workout UIs, mini-games, and
-interactive experiences using HTML, CSS, and JavaScript.
+A Kotlin Android app that bridges your rowing machine's serial interface with
+web-based interfaces. Build custom workout UIs, mini-games, and interactive
+experiences using HTML, CSS, and JavaScript.
 
 ## Features
 
@@ -16,7 +16,7 @@ interactive experiences using HTML, CSS, and JavaScript.
 
 ## Prerequisites
 
-- Sportstech S-Row with Android 13 (SP2101V board)
+- Rowing machine with Android 13 (SP2101V board)
 - WiFi debugging enabled (see installation below)
 - Development machine on same network as rowing machine
 - Web server for hosting your UI (or use the example)
@@ -45,7 +45,7 @@ cd clean-row
 
 The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 
-### 3. Enable Wireless Debugging on S-Row
+### 3. Enable Wireless Debugging on Rowing Machine
 
 On the rowing machine's touchscreen:
 
@@ -287,7 +287,7 @@ To avoid rebuilding the APK every time:
 ## Serial Protocol Details
 
 The app communicates with `/dev/ttyS2` at 19200 baud (8N1). The protocol is
-fully documented in the Obsidian vault note: **"Escaping the Sportstech S-Row
+fully documented in the Obsidian vault note: **"Escaping the Rowing Machine
 Kiosk App via ADB"**.
 
 Key packet format:
@@ -365,7 +365,7 @@ Key packet format:
                │
                ▼
 ┌──────────────────────────────────────────┐
-│    Sportstech S-Row Hardware            │
+│    Rowing Machine Hardware              │
 │  - Brake controller                      │
 │  - Sensors (RPM, power)                  │
 │  - LED strip                             │
@@ -404,7 +404,7 @@ MIT - Use freely for your own rowing adventures!
 
 ## Credits
 
-- Serial protocol reverse-engineered from Sportstech APK
+- Serial protocol reverse-engineered from vendor APK
 - Built with AndroidX, Kotlin, and coroutines
 - WebView bridge pattern inspired by React Native
 
