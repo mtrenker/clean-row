@@ -1,0 +1,762 @@
+<!-- manifest: {"type":"game","difficulty":"hard","tags":["power","compete"],"metric_weights":{"watts":0.5,"completion":0.3,"fun":0.2}} -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Titan Raid</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #050510;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+  }
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  /* HP bar spanning full width */
+  #hp-wrap {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    background: rgba(0,0,0,0.6);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+  }
+  #hp-label {
+    font-size: 0.75em;
+    color: #888;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  #hp-track {
+    flex: 1;
+    height: 18px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 9px;
+    overflow: hidden;
+    position: relative;
+  }
+  #hp-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(to right, #ff2244, #ff6600, #ffcc00);
+    border-radius: 9px;
+    transition: width 0.15s linear;
+  }
+  /* Phase threshold markers */
+  #hp-track::before, #hp-track::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 2px;
+    background: rgba(255,255,255,0.3);
+    z-index: 2;
+  }
+  #hp-track::before { left: 33.35%; }
+  #hp-track::after  { left: 66.7%; }
+  #hp-value {
+    font-size: 0.85em;
+    color: #ccc;
+    min-width: 70px;
+    text-align: right;
+  }
+  #connection {
+    position: absolute;
+    top: 54px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8em;
+    background: rgba(0,0,0,0.5);
+    padding: 4px 16px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+  }
+  #phase-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 4em;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    opacity: 0;
+    pointer-events: none;
+    text-shadow: 0 0 40px currentColor;
+    transition: opacity 0.3s;
+  }
+  #bottom-hud {
+    position: absolute;
+    bottom: 24px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 30px;
+    pointer-events: none;
+  }
+  .bottom-stat {
+    background: rgba(0,0,0,0.55);
+    padding: 10px 20px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .bottom-stat .lbl {
+    font-size: 0.68em;
+    color: #888;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .bottom-stat .val {
+    font-size: 2em;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1.1;
+  }
+  /* Floating damage numbers container */
+  #dmg-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .dmg-num {
+    position: absolute;
+    font-size: 1.8em;
+    font-weight: bold;
+    pointer-events: none;
+    animation: floatUp 1.4s ease-out forwards;
+  }
+  @keyframes floatUp {
+    0%   { opacity: 1;   transform: translateY(0) scale(1); }
+    60%  { opacity: 1; }
+    100% { opacity: 0;   transform: translateY(-120px) scale(0.7); }
+  }
+  /* Boss attack shake */
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    15%  { transform: translateX(-10px); }
+    35%  { transform: translateX(10px); }
+    55%  { transform: translateX(-7px); }
+    75%  { transform: translateX(7px); }
+  }
+  .shaking { animation: shake 0.35s ease; }
+
+  /* Attack flash overlay */
+  #attack-flash {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255,20,20,0.0);
+    pointer-events: none;
+    z-index: 5;
+    transition: background 0.05s;
+  }
+  /* Vignette (phase 3) */
+  #vignette {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 4;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(80,0,120,0.55) 100%);
+    opacity: 0;
+    transition: opacity 1.5s;
+  }
+
+  /* End overlay */
+  #overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(5,5,16,0.93);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 20px;
+  }
+  #overlay.active { display: flex; }
+  #overlay h1 { font-size: 4em; text-shadow: 0 0 40px currentColor; }
+  #overlay h1.win  { color: #00ff88; }
+  #overlay h1.loss { color: #ff2244; }
+  #overlay .stat-row { font-size: 1.3em; color: #ccc; }
+  #overlay .stat-row span { font-weight: bold; color: #fff; }
+  #rating-label { font-size: 0.9em; color: #888; margin-top: 6px; }
+  #rating-wrap { display: flex; gap: 16px; }
+  .star-btn { font-size: 2.5em; cursor: pointer; opacity: 0.4; transition: opacity 0.15s, transform 0.15s; pointer-events: all; }
+  .star-btn:hover, .star-btn.lit { opacity: 1; transform: scale(1.2); }
+</style>
+</head>
+<body>
+<script src="/shared/nav.js"></script>
+
+<canvas id="c"></canvas>
+<div id="attack-flash"></div>
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="hp-wrap">
+    <span id="hp-label">TITAN HP</span>
+    <div id="hp-track"><div id="hp-fill"></div></div>
+    <span id="hp-value">2000</span>
+  </div>
+
+  <span id="connection">⚪ Connecting...</span>
+
+  <div id="phase-label">PHASE 2</div>
+
+  <div id="bottom-hud">
+    <div class="bottom-stat">
+      <div class="lbl">Last Strike</div>
+      <div class="val" id="last-dmg">—</div>
+    </div>
+    <div class="bottom-stat">
+      <div class="lbl">Total Damage</div>
+      <div class="val" id="total-dmg">0</div>
+    </div>
+    <div class="bottom-stat">
+      <div class="lbl">Watts</div>
+      <div class="val" id="cur-watts">0</div>
+    </div>
+  </div>
+
+  <div id="dmg-layer"></div>
+</div>
+
+<div id="overlay">
+  <h1 id="overlay-title">TITAN SLAIN</h1>
+  <div class="stat-row">Total Damage: <span id="res-dmg">—</span></div>
+  <div class="stat-row">Total Strokes: <span id="res-strokes">—</span></div>
+  <div class="stat-row">Time: <span id="res-time">—</span></div>
+  <div id="rating-label">Rate this experiment</div>
+  <div id="rating-wrap">
+    <span class="star-btn" data-r="1">★</span>
+    <span class="star-btn" data-r="2">★</span>
+    <span class="star-btn" data-r="3">★</span>
+    <span class="star-btn" data-r="4">★</span>
+    <span class="star-btn" data-r="5">★</span>
+  </div>
+</div>
+
+<script src="/sdk/experiment-sdk.js"></script>
+<script>
+(function () {
+  // ─── canvas ───
+  const canvas = document.getElementById('c');
+  const ctx    = canvas.getContext('2d');
+  function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+  const W = () => canvas.width;
+  const H = () => canvas.height;
+
+  // ─── game state ───
+  const BOSS_MAX_HP        = 2000;
+  const PHASE2_THRESHOLD   = 1334;
+  const PHASE3_THRESHOLD   = 667;
+  const REGEN_RATE         = 2;      // HP/s when watts < 40
+  const REGEN_WATTS_CUTOFF = 40;
+
+  let bossHP      = BOSS_MAX_HP;
+  let phase       = 1;              // 1, 2, or 3
+  let totalDmg    = 0;
+  let currentWatts = 0;
+  let finished    = false;
+  let ratingDone  = false;
+
+  // Boss attack timing
+  let nextAttackIn  = 8 + Math.random() * 4; // seconds
+  let attackFlashT  = 0;                      // remaining flash seconds
+
+  // Boss rotation angle + animation
+  let bossAngle     = 0;
+  let bossScale     = 1;
+  let energyRings   = [];   // { r, alpha } for phase 3 rings
+  let fireParticles = [];   // { x, y, vx, vy, life, maxLife, col } for phase 2
+
+  // Phase label display
+  let phaseLabelTimer = 0;  // seconds to show label
+
+  let lastFrameTime = performance.now();
+
+  // ─── colours per phase ───
+  const PHASE_COLORS = {
+    1: { primary: '#4488ff', secondary: '#aaccff', glow: '#2255dd' },
+    2: { primary: '#ff6600', secondary: '#ff3300', glow: '#cc3300' },
+    3: { primary: '#9900ff', secondary: '#cc44ff', glow: '#7700cc' },
+  };
+
+  // ─── HP bar ───
+  function updateHPUI() {
+    const pct = Math.max(0, bossHP / BOSS_MAX_HP) * 100;
+    document.getElementById('hp-fill').style.width = pct + '%';
+    document.getElementById('hp-value').textContent = Math.max(0, Math.round(bossHP));
+  }
+
+  // ─── phase transition ───
+  function checkPhaseTransition() {
+    let newPhase = 1;
+    if (bossHP <= PHASE3_THRESHOLD) newPhase = 3;
+    else if (bossHP <= PHASE2_THRESHOLD) newPhase = 2;
+
+    if (newPhase !== phase) {
+      phase = newPhase;
+      triggerPhaseTransition();
+    }
+  }
+
+  function triggerPhaseTransition() {
+    // Flash vignette update
+    document.getElementById('vignette').style.opacity = phase === 3 ? '1' : '0';
+
+    // Phase label
+    const el = document.getElementById('phase-label');
+    el.textContent = 'PHASE ' + phase;
+    const cols = PHASE_COLORS[phase];
+    el.style.color = cols.primary;
+    el.style.opacity = '1';
+    phaseLabelTimer = 2.0;
+
+    // Screen flash
+    flashAttack('#ffffff', 0.6, 0.4);
+
+    // Reset particles for phase 2
+    if (phase === 2) fireParticles = [];
+    if (phase === 3) energyRings   = [];
+
+    updateLED();
+  }
+
+  // ─── LED ───
+  function updateLED() {
+    switch (phase) {
+      case 1: sdk.setLedPreset(1); break;   // blue
+      case 2: sdk.setLedPreset(5); break;   // orange
+      case 3: sdk.setLedPreset(7); break;   // purple
+    }
+  }
+
+  // ─── boss attack ───
+  function triggerBossAttack() {
+    flashAttack('#ff1414', 0.45, 0.25);
+    canvas.classList.add('shaking');
+    setTimeout(() => canvas.classList.remove('shaking'), 400);
+    nextAttackIn = 7 + Math.random() * 5;
+    sdk.setLedPreset(6); // red
+    setTimeout(updateLED, 1000);
+  }
+
+  function flashAttack(color, maxAlpha, duration) {
+    const el = document.getElementById('attack-flash');
+    el.style.transition = 'none';
+    el.style.background = color.replace(')', `,${maxAlpha})`).replace('rgb', 'rgba');
+    requestAnimationFrame(() => {
+      el.style.transition = `background ${duration}s ease`;
+      el.style.background = color.replace(')', ',0)').replace('rgb', 'rgba');
+    });
+  }
+
+  // ─── damage number pop ───
+  function spawnDmgNumber(dmg) {
+    const el     = document.createElement('div');
+    el.className = 'dmg-num';
+    el.textContent = '+' + Math.round(dmg);
+    const cx = W() / 2 + (Math.random() - 0.5) * 200;
+    const cy = H() / 2 + (Math.random() - 0.5) * 100;
+    el.style.left  = cx + 'px';
+    el.style.top   = cy + 'px';
+    const col = PHASE_COLORS[phase].secondary;
+    el.style.color       = col;
+    el.style.textShadow  = `0 0 14px ${col}`;
+    document.getElementById('dmg-layer').appendChild(el);
+    setTimeout(() => el.remove(), 1500);
+  }
+
+  // ─── draw frame ───
+  function drawFrame(now) {
+    const dt = Math.min((now - lastFrameTime) / 1000, 0.1);
+    lastFrameTime = now;
+
+    if (!finished) {
+      // Regen
+      if (currentWatts < REGEN_WATTS_CUTOFF) {
+        bossHP = Math.min(BOSS_MAX_HP, bossHP + REGEN_RATE * dt);
+        updateHPUI();
+      }
+
+      // Boss attack timer
+      nextAttackIn -= dt;
+      if (nextAttackIn <= 0) triggerBossAttack();
+
+      // Phase label timer
+      if (phaseLabelTimer > 0) {
+        phaseLabelTimer -= dt;
+        if (phaseLabelTimer <= 0) {
+          document.getElementById('phase-label').style.opacity = '0';
+        }
+      }
+
+      // Rotation speed per phase
+      const rotSpeed = [0, 0.3, 0.7, 1.2][phase];
+      bossAngle += rotSpeed * dt;
+
+      // Phase-specific animations
+      if (phase === 2) updateFireParticles(dt);
+      if (phase === 3) updateEnergyRings(dt);
+    }
+
+    ctx.clearRect(0, 0, W(), H());
+    drawBackground();
+    if (phase === 3) drawEnergyRings();
+    if (phase === 2) drawFireParticles();
+    drawBoss();
+
+    requestAnimationFrame(drawFrame);
+  }
+
+  function drawBackground() {
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, W(), H());
+
+    // Subtle grid lines in background
+    ctx.save();
+    ctx.strokeStyle = 'rgba(40,40,80,0.35)';
+    ctx.lineWidth = 1;
+    const step = 80;
+    for (let x = 0; x < W(); x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H()); ctx.stroke();
+    }
+    for (let y = 0; y < H(); y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W(), y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBoss() {
+    const cx = W() / 2;
+    const cy = H() / 2 - 20;
+    const cols = PHASE_COLORS[phase];
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(bossAngle);
+
+    ctx.shadowBlur  = 40;
+    ctx.shadowColor = cols.glow;
+
+    if (phase === 1) drawBossPhase1(cols);
+    if (phase === 2) drawBossPhase2(cols);
+    if (phase === 3) drawBossPhase3(cols);
+
+    ctx.restore();
+  }
+
+  // Phase 1: Mechanical hexagonal construct
+  function drawBossPhase1(cols) {
+    const r = 160;
+    // Outer hex
+    hexagon(0, 0, r, cols.primary, 3, true);
+    // Inner hex (counter-rotated)
+    ctx.save();
+    ctx.rotate(-bossAngle * 2);
+    hexagon(0, 0, r * 0.65, cols.secondary, 2, false);
+    ctx.restore();
+    // Centre core
+    ctx.save();
+    ctx.rotate(-bossAngle * 3);
+    hexagon(0, 0, r * 0.28, cols.primary, 0, true, 0.6);
+    ctx.restore();
+    // Spoke lines
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i;
+      ctx.strokeStyle = cols.secondary;
+      ctx.lineWidth   = 1.5;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.28, Math.sin(a) * r * 0.28);
+      ctx.lineTo(Math.cos(a) * r * 0.65, Math.sin(a) * r * 0.65);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Phase 2: Fire form — fragmented triangles
+  function drawBossPhase2(cols) {
+    const r = 175;
+    // Outer spiky ring (8-pointed)
+    star(0, 0, r * 0.5, r, 8, cols.primary, 2.5, true);
+    // Inner rotating triangle
+    ctx.save();
+    ctx.rotate(-bossAngle * 1.5);
+    triangle(0, 0, r * 0.5, cols.secondary, 2, false);
+    ctx.restore();
+    // Reverse triangle
+    ctx.save();
+    ctx.rotate(bossAngle * 0.8);
+    triangle(0, 0, r * 0.35, cols.primary, 0, true, 0.7);
+    ctx.restore();
+  }
+
+  // Phase 3: Void form — concentric circles + eye
+  function drawBossPhase3(cols) {
+    const r = 170;
+    // Outer pulsing circle
+    ctx.strokeStyle = cols.primary;
+    ctx.lineWidth   = 3;
+    ctx.shadowBlur  = 30;
+    ctx.shadowColor = cols.glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // Middle circle
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = cols.secondary;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.62, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner filled core
+    ctx.fillStyle = cols.primary;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // Eye slit
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r * 0.12, r * 0.05, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    // Rotating arc segments
+    for (let i = 0; i < 4; i++) {
+      const a = bossAngle + (Math.PI / 2) * i;
+      ctx.strokeStyle = cols.secondary;
+      ctx.lineWidth   = 2;
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.82, a, a + 0.6);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ─── shape helpers ───
+  function hexagon(cx, cy, r, col, lw, fill, alpha = 1) {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i - Math.PI / 6;
+      i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+              : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = col; ctx.fill(); }
+    if (lw > 0) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function triangle(cx, cy, r, col, lw, fill, alpha = 1) {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = (Math.PI * 2 / 3) * i - Math.PI / 2;
+      i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+              : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = col; ctx.fill(); }
+    if (lw > 0) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function star(cx, cy, r1, r2, pts, col, lw, fill, alpha = 1) {
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    for (let i = 0; i < pts * 2; i++) {
+      const a = (Math.PI * i / pts) - Math.PI / 2;
+      const r = i % 2 === 0 ? r2 : r1;
+      i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a))
+              : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = col; ctx.fill(); }
+    if (lw > 0) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  // ─── phase 2 fire particles ───
+  function updateFireParticles(dt) {
+    // Emit new particles
+    const emitCount = Math.round(3 + currentWatts / 30);
+    for (let i = 0; i < emitCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const spd   = 60 + Math.random() * 120;
+      fireParticles.push({
+        x: W() / 2 + (Math.random() - 0.5) * 80,
+        y: H() / 2 + (Math.random() - 0.5) * 80,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd - 40,
+        life: 0,
+        maxLife: 0.6 + Math.random() * 0.8,
+        col: Math.random() < 0.5 ? '#ff6600' : '#ff3300',
+      });
+    }
+    // Age particles
+    for (let i = fireParticles.length - 1; i >= 0; i--) {
+      const p = fireParticles[i];
+      p.life += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 30 * dt; // slight upward drift
+      if (p.life >= p.maxLife) fireParticles.splice(i, 1);
+    }
+    // Cap for performance
+    if (fireParticles.length > 400) fireParticles.splice(0, fireParticles.length - 400);
+  }
+
+  function drawFireParticles() {
+    ctx.save();
+    for (const p of fireParticles) {
+      const t = 1 - p.life / p.maxLife;
+      ctx.globalAlpha = t * 0.8;
+      ctx.fillStyle   = p.col;
+      ctx.shadowColor = p.col;
+      ctx.shadowBlur  = 6;
+      const sz = 3 + t * 5;
+      ctx.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
+    }
+    ctx.restore();
+  }
+
+  // ─── phase 3 energy rings ───
+  function updateEnergyRings(dt) {
+    // Spawn a ring every ~1.5s
+    if (!energyRings._timer) energyRings._timer = 0;
+    energyRings._timer += dt;
+    if (energyRings._timer > 1.5) {
+      energyRings._timer = 0;
+      energyRings.push({ r: 0, alpha: 0.9 });
+    }
+    for (let i = energyRings.length - 1; i >= 0; i--) {
+      energyRings[i].r     += 220 * dt;
+      energyRings[i].alpha -= dt * 0.6;
+      if (energyRings[i].alpha <= 0) energyRings.splice(i, 1);
+    }
+  }
+
+  function drawEnergyRings() {
+    const cx = W() / 2;
+    const cy = H() / 2 - 20;
+    const col = PHASE_COLORS[3].primary;
+    ctx.save();
+    for (const ring of energyRings) {
+      ctx.globalAlpha = ring.alpha;
+      ctx.strokeStyle = col;
+      ctx.lineWidth   = 2;
+      ctx.shadowColor = col;
+      ctx.shadowBlur  = 20;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ring.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // ─── session end overlay ───
+  function showOverlay(won, summary) {
+    const el        = document.getElementById('overlay');
+    const title     = document.getElementById('overlay-title');
+    title.textContent = won ? '⚡ TITAN SLAIN' : 'OVERWHELMED';
+    title.className   = won ? 'win' : 'loss';
+
+    const mins = Math.floor(summary.duration_s / 60).toString().padStart(2, '0');
+    const secs = Math.floor(summary.duration_s % 60).toString().padStart(2, '0');
+    document.getElementById('res-dmg').textContent     = Math.round(totalDmg);
+    document.getElementById('res-strokes').textContent = summary.total_strokes;
+    document.getElementById('res-time').textContent    = mins + ':' + secs;
+    el.classList.add('active');
+  }
+
+  // Rating stars
+  document.querySelectorAll('.star-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (ratingDone) return;
+      ratingDone = true;
+      const r = parseInt(btn.dataset.r);
+      document.querySelectorAll('.star-btn').forEach((s, i) => s.classList.toggle('lit', i < r));
+      await sdk.submitRating(r);
+    });
+  });
+
+  // ─── SDK ───
+  const sdk = new ExperimentSDK({
+    onStroke(data) {
+      if (finished) return;
+      currentWatts = data.watts;
+
+      const dmg = Math.max(0, (data.watts - 20) / 5);
+      if (dmg > 0) {
+        bossHP    -= dmg;
+        totalDmg  += dmg;
+        spawnDmgNumber(dmg);
+
+        document.getElementById('last-dmg').textContent  = Math.round(dmg);
+        document.getElementById('total-dmg').textContent = Math.round(totalDmg);
+
+        updateHPUI();
+        checkPhaseTransition();
+
+        if (bossHP <= 0 && !finished) {
+          finished = true;
+          bossHP   = 0;
+          updateHPUI();
+          sdk.setLedPreset(3); // green
+          sdk.markComplete();
+        }
+      }
+
+      document.getElementById('cur-watts').textContent = data.watts;
+    },
+
+    onInterval(data) {
+      currentWatts = data.watts;
+      document.getElementById('cur-watts').textContent = data.watts;
+    },
+
+    onSessionEnd(summary) {
+      finished = true;
+      const won = summary.completed;
+      showOverlay(won, summary);
+    },
+  });
+
+  // Connection status
+  document.addEventListener('connectionStatus', e => {
+    const el = document.getElementById('connection');
+    el.textContent = e.detail.connected ? '🟢 Machine Connected' : '🔴 Disconnected';
+  });
+
+  window.addEventListener('buttonPress', e => {
+    if (e.detail.type === 'longPress') sdk.quit();
+  });
+
+  requestAnimationFrame(drawFrame);
+})();
+</script>
+</body>
+</html>

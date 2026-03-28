@@ -1,0 +1,729 @@
+<!-- manifest: {"type":"challenge","difficulty":"hard","tags":["power","speed"],"metric_weights":{"watts":0.4,"completion":0.4,"fun":0.2}} -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summit Sprint</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f0820;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+  }
+  canvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #connection {
+    position: absolute;
+    top: 16px; left: 20px;
+    font-size: 0.85em;
+    background: rgba(0,0,0,0.45);
+    padding: 6px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+  }
+  #stats {
+    position: absolute;
+    top: 16px; right: 20px;
+    text-align: right;
+    background: rgba(0,0,0,0.45);
+    padding: 12px 18px;
+    border-radius: 14px;
+    min-width: 200px;
+  }
+  #altitude-display {
+    font-size: 2.6em;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 24px rgba(120,200,255,0.7);
+    line-height: 1;
+  }
+  #watts-display {
+    font-size: 1.15em;
+    color: #f7c948;
+    margin-top: 6px;
+  }
+  #spm-display {
+    font-size: 0.9em;
+    color: rgba(255,255,255,0.55);
+    margin-top: 3px;
+  }
+  #danger-wrap {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 0 0 4px 0;
+  }
+  #danger-label {
+    text-align: center;
+    font-size: 0.75em;
+    color: #ff5533;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.4s;
+    margin-bottom: 4px;
+    text-shadow: 0 0 12px #ff5533;
+  }
+  #danger-label.visible { opacity: 1; }
+  #danger-bar {
+    height: 5px;
+    background: linear-gradient(to right, #ff2200, #ff7700, #ff2200);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.35s ease;
+    box-shadow: 0 0 14px #ff4400;
+  }
+
+  /* Summit overlay */
+  #summit-overlay {
+    position: fixed;
+    inset: 0;
+    background: #fff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    transition: opacity 0.6s ease;
+  }
+  #summit-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+  #summit-text {
+    font-size: 7em;
+    font-weight: bold;
+    color: #1a0f3d;
+    letter-spacing: 0.08em;
+    text-shadow: 0 4px 40px rgba(80,180,255,0.5);
+  }
+  #summit-sub {
+    font-size: 1.5em;
+    color: rgba(20,10,60,0.65);
+    margin-top: -10px;
+  }
+  #summit-rating-label {
+    font-size: 1em;
+    color: rgba(20,10,60,0.5);
+    margin-top: 8px;
+  }
+
+  /* End (failure) screen */
+  #end-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(8,3,18,0.93);
+    z-index: 20;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    text-align: center;
+  }
+  #end-screen.show { display: flex; }
+  #end-screen h2 {
+    font-size: 3em;
+    color: #ff4444;
+    text-shadow: 0 0 40px rgba(255,60,60,0.6);
+  }
+  #end-stats {
+    font-size: 1.2em;
+    opacity: 0.65;
+  }
+  #end-rating-label {
+    font-size: 1em;
+    opacity: 0.45;
+    margin-top: 6px;
+  }
+
+  /* Shared rating buttons */
+  .rating-buttons { display: flex; gap: 14px; margin-top: 4px; }
+  .rating-btn {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: transparent;
+    color: #fff;
+    font-size: 1.4em;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    pointer-events: all;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+  }
+  .rating-btn:hover, .rating-btn.selected {
+    background: #f7c948;
+    border-color: #f7c948;
+    color: #1a0f3d;
+  }
+  /* In summit overlay, dark buttons */
+  #summit-overlay .rating-btn {
+    border-color: rgba(20,10,60,0.35);
+    color: #1a0f3d;
+  }
+  #summit-overlay .rating-btn:hover,
+  #summit-overlay .rating-btn.selected {
+    background: #f7c948;
+    border-color: #f7c948;
+    color: #1a0f3d;
+  }
+</style>
+</head>
+<body>
+<script src="/shared/nav.js"></script>
+
+<canvas id="canvas"></canvas>
+
+<div id="hud">
+  <div id="connection">⚪ Connecting...</div>
+  <div id="stats">
+    <div id="altitude-display">0 / 1000 m</div>
+    <div id="watts-display">0 W</div>
+    <div id="spm-display">0 SPM</div>
+  </div>
+  <div id="danger-wrap">
+    <div id="danger-label">⚡ Storm Rising</div>
+    <div id="danger-bar"></div>
+  </div>
+</div>
+
+<!-- Summit success overlay -->
+<div id="summit-overlay">
+  <div id="summit-text">SUMMIT</div>
+  <div id="summit-sub">1000 m — You made it!</div>
+  <div id="summit-rating-label">How was the climb?</div>
+  <div class="rating-buttons" id="summit-rating">
+    <button class="rating-btn" data-rating="1">1</button>
+    <button class="rating-btn" data-rating="2">2</button>
+    <button class="rating-btn" data-rating="3">3</button>
+    <button class="rating-btn" data-rating="4">4</button>
+    <button class="rating-btn" data-rating="5">5</button>
+  </div>
+</div>
+
+<!-- Storm-caught failure screen -->
+<div id="end-screen">
+  <h2>⛈ Swept Away</h2>
+  <p id="end-stats"></p>
+  <div id="end-rating-label">How was it?</div>
+  <div class="rating-buttons" id="fail-rating">
+    <button class="rating-btn" data-rating="1">1</button>
+    <button class="rating-btn" data-rating="2">2</button>
+    <button class="rating-btn" data-rating="3">3</button>
+    <button class="rating-btn" data-rating="4">4</button>
+    <button class="rating-btn" data-rating="5">5</button>
+  </div>
+</div>
+
+<script src="/sdk/experiment-sdk.js"></script>
+<script>
+  // ── Canvas setup ──────────────────────────────────────────────────────────
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    buildRockColumns();
+    buildMountains();
+  }
+  window.addEventListener('resize', resize);
+
+  // ── Constants ─────────────────────────────────────────────────────────────
+  const SUMMIT_M        = 1000;
+  const STALL_W         = 30;    // below this: no climb progress
+  const STORM_RISE_W    = 50;    // below: storm rises
+  const STORM_HOLD_W    = 80;    // above: storm recedes
+  const MAX_SCROLL_PX_S = 260;   // px/s at max effort (~250W)
+  const ROCK_TILE_H     = 80;    // height of one cliff tile row
+  const SKY_FRAC        = 0.22;  // left fraction of screen = open sky
+
+  // ── Game state ────────────────────────────────────────────────────────────
+  let altitude      = 0;         // metres climbed 0–1000
+  let scrollSpeed   = 0;         // current cliff scroll speed px/s
+  let targetScroll  = 0;         // target scroll speed (set per stroke)
+  let cliffScrollY  = 0;         // cumulative scroll offset for tile tiling
+  let stormRise     = 0;         // 0.0 = bottom; 1.0 = reached climber → game over
+  let lastWatts     = 0;
+  let lastSpm       = 0;
+  let gameOver      = false;
+  let summitReached = false;
+  let lastFrame     = performance.now();
+  let shakeX        = 0;
+  let shakeY        = 0;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function lerp(a, b, t) { return a + (b - a) * t; }
+
+  // ── Rock columns (cliff face) ─────────────────────────────────────────────
+  const NUM_COLS = 14;
+  let rockCols = [];
+
+  function buildRockColumns() {
+    rockCols = [];
+    const cliffLeft = W * SKY_FRAC;
+    const cliffW = W - cliffLeft;
+    const colW = cliffW / NUM_COLS;
+    for (let i = 0; i < NUM_COLS; i++) {
+      rockCols.push({
+        x:           cliffLeft + i * colW,
+        w:           colW,
+        baseShade:   22 + Math.floor(Math.random() * 18),
+        crackSeed:   Math.random() * ROCK_TILE_H,
+        altShade:    (i % 3) * 3,
+      });
+    }
+  }
+
+  function drawCliff() {
+    const cliffLeft = W * SKY_FRAC;
+    // Fill cliff region
+    ctx.fillStyle = '#17100a';
+    ctx.fillRect(cliffLeft, 0, W - cliffLeft, H);
+
+    // Scrolling tile rows (positive scrollY → tiles move downward → climb illusion)
+    const offsetY = cliffScrollY % ROCK_TILE_H;
+    const rows = Math.ceil(H / ROCK_TILE_H) + 2;
+    const startY = offsetY - ROCK_TILE_H;
+
+    for (let row = 0; row < rows; row++) {
+      const ty = startY + row * ROCK_TILE_H;
+      for (const col of rockCols) {
+        const shade = col.baseShade + col.altShade + (row % 2) * 4;
+        const r = shade + 8, g = shade + 2, b = shade - 4;
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(col.x + 1, ty + 1, col.w - 2, ROCK_TILE_H - 2);
+
+        // Horizontal joint crack
+        ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const crackY = ty + ROCK_TILE_H - 2 + (col.crackSeed % 5) - 2;
+        ctx.moveTo(col.x,          crackY);
+        ctx.lineTo(col.x + col.w,  crackY + (col.crackSeed % 3) - 1);
+        ctx.stroke();
+
+        // Vertical fracture (subtle)
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        const fx = col.x + col.w * ((col.crackSeed * 0.41) % 1);
+        ctx.moveTo(fx,     ty);
+        ctx.lineTo(fx + 4, ty + ROCK_TILE_H);
+        ctx.stroke();
+      }
+    }
+
+    // Left-cliff-edge shadow (depth at boundary)
+    const edgeGrad = ctx.createLinearGradient(cliffLeft, 0, cliffLeft + W * 0.06, 0);
+    edgeGrad.addColorStop(0, 'rgba(0,0,0,0.75)');
+    edgeGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = edgeGrad;
+    ctx.fillRect(cliffLeft, 0, W * 0.06, H);
+
+    // Right-cliff shadow
+    const rightGrad = ctx.createLinearGradient(W, 0, W * 0.9, 0);
+    rightGrad.addColorStop(0, 'rgba(0,0,0,0.5)');
+    rightGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = rightGrad;
+    ctx.fillRect(W * 0.9, 0, W * 0.1, H);
+  }
+
+  // ── Sky strip (left of cliff) ─────────────────────────────────────────────
+  function drawSky() {
+    const skyW = W * SKY_FRAC;
+    const t = altitude / SUMMIT_M;
+
+    // Storm purple at 0% altitude → dawn blue-gold at summit
+    const topR = Math.round(lerp(18, 28, t));
+    const topG = Math.round(lerp(6,  55, t));
+    const topB = Math.round(lerp(48, 110, t));
+    const botR = Math.round(lerp(55, 160, t));
+    const botG = Math.round(lerp(18,  90, t));
+    const botB = Math.round(lerp(75,  70, t));
+
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, `rgb(${topR},${topG},${topB})`);
+    grad.addColorStop(1, `rgb(${botR},${botG},${botB})`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, skyW, H);
+  }
+
+  // ── Distant mountain silhouettes ──────────────────────────────────────────
+  let mountains = [];
+  let mountainDrift = 0;
+
+  function buildMountains() {
+    mountains = [];
+    const skyW = W * SKY_FRAC;
+    const count = 7;
+    const spacing = skyW / (count - 1);
+    for (let i = 0; i < count; i++) {
+      mountains.push({
+        baseX:  i * spacing,
+        peakY:  H * (0.22 + (i % 3) * 0.12),
+        halfW:  spacing * (0.5 + (i % 2) * 0.3),
+        shade:  14 + i * 6,
+      });
+    }
+  }
+
+  function drawMountains() {
+    const skyW = W * SKY_FRAC;
+    const t = altitude / SUMMIT_M;
+    mountainDrift += 0.25; // slow rightward parallax drift
+
+    for (const m of mountains) {
+      const x = ((m.baseX - mountainDrift * 0.3) % (skyW + m.halfW * 2) + skyW + m.halfW * 2) % (skyW + m.halfW * 2) - m.halfW;
+      const shade = Math.round(m.shade + t * 35);
+      ctx.fillStyle = `rgb(${shade},${shade - 4},${shade + 8})`;
+      ctx.beginPath();
+      ctx.moveTo(x - m.halfW, H);
+      ctx.lineTo(x,           m.peakY);
+      ctx.lineTo(x + m.halfW, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // ── Wind / debris particles ───────────────────────────────────────────────
+  const MAX_PARTICLES = 130;
+  let particles = [];
+
+  function spawnParticle(randomY) {
+    return {
+      x:    randomY ? Math.random() * W : W * SKY_FRAC + Math.random() * (W * (1 - SKY_FRAC)),
+      y:    randomY ? Math.random() * H : -8,
+      vx:  -(1.5 + Math.random() * 2.5),
+      vy:   (1 + Math.random() * 2),
+      r:    0.6 + Math.random() * 1.4,
+      a:    0.25 + Math.random() * 0.45,
+    };
+  }
+
+  function initParticles() {
+    for (let i = 0; i < 60; i++) particles.push(spawnParticle(true));
+  }
+
+  function drawParticles(watts, dt) {
+    const target = Math.min(MAX_PARTICLES, Math.round((Math.max(0, watts - 20) / 180) * MAX_PARTICLES));
+    while (particles.length < target) particles.push(spawnParticle(false));
+
+    ctx.save();
+    const stormFactor = 1 + stormRise * 2.2;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx * stormFactor * dt * 60;
+      p.y += p.vy * stormFactor * dt * 60;
+      if (p.y > H + 10 || p.x < -10) {
+        particles[i] = spawnParticle(false);
+        particles[i].x = W + Math.random() * 40;
+        particles[i].y = Math.random() * H * 0.6;
+        continue;
+      }
+      ctx.globalAlpha = p.a;
+      ctx.fillStyle = '#cce8ff';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // ── Storm cloud band ──────────────────────────────────────────────────────
+  function updateStorm(watts, dt) {
+    if (watts < STORM_RISE_W) {
+      stormRise = Math.min(1, stormRise + dt * 0.015);
+    } else if (watts >= STORM_HOLD_W) {
+      stormRise = Math.max(0, stormRise - dt * 0.02);
+    }
+  }
+
+  function drawStorm() {
+    if (stormRise <= 0.01) return;
+
+    // Storm top Y: rises from screen bottom up toward H*0.5 (climber position)
+    const climberY = H * 0.5;
+    const stormTopY = lerp(H, climberY - 20, stormRise);
+
+    const grad = ctx.createLinearGradient(0, stormTopY, 0, H);
+    grad.addColorStop(0,    'rgba(15,4,30,0)');
+    grad.addColorStop(0.18, 'rgba(25,8,48,0.72)');
+    grad.addColorStop(1,    'rgba(8,3,18,0.97)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, stormTopY, W, H - stormTopY);
+
+    // Update danger HUD
+    const dangerBar   = document.getElementById('danger-bar');
+    const dangerLabel = document.getElementById('danger-label');
+    dangerBar.style.transform = `scaleX(${stormRise})`;
+    if (stormRise > 0.15) {
+      dangerLabel.classList.add('visible');
+    } else {
+      dangerLabel.classList.remove('visible');
+    }
+
+    // Lightning flash when storm is active and watts are very low
+    if (lastWatts < STORM_RISE_W && Math.random() < 0.035) {
+      ctx.fillStyle = 'rgba(180,160,255,0.1)';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Game-over trigger
+    if (stormRise >= 1 && !gameOver && !summitReached) {
+      triggerGameOver();
+    }
+  }
+
+  // ── Climber silhouette ────────────────────────────────────────────────────
+  function drawClimber() {
+    const cx = W * SKY_FRAC + 14;  // right at cliff edge
+    const cy = H * 0.5;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    const s = 1.35;
+    ctx.fillStyle   = 'rgba(0,0,0,0.88)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.88)';
+    ctx.lineCap     = 'round';
+    ctx.lineWidth   = 3 * s;
+
+    // Body
+    ctx.beginPath();
+    ctx.ellipse(0, 4 * s, 5 * s, 9 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -10 * s, 6 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Left arm reaching up to cliff
+    ctx.beginPath();
+    ctx.moveTo(-2 * s, -2 * s);
+    ctx.lineTo(-6 * s, -24 * s);
+    ctx.stroke();
+
+    // Right arm up
+    ctx.beginPath();
+    ctx.moveTo(2 * s, -2 * s);
+    ctx.lineTo(10 * s, -20 * s);
+    ctx.stroke();
+
+    // Left leg down
+    ctx.beginPath();
+    ctx.moveTo(-2 * s, 10 * s);
+    ctx.lineTo(-8 * s, 24 * s);
+    ctx.stroke();
+
+    // Right leg
+    ctx.beginPath();
+    ctx.moveTo(2 * s, 10 * s);
+    ctx.lineTo(10 * s, 22 * s);
+    ctx.stroke();
+
+    // Helmet (accent colour)
+    ctx.fillStyle = 'rgba(255,70,40,0.82)';
+    ctx.beginPath();
+    ctx.arc(0, -13 * s, 5.5 * s, Math.PI, 0);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ── Altitude progress bar (thin line at cliff edge) ───────────────────────
+  function drawProgressLine() {
+    const cliffLeft = W * SKY_FRAC;
+    const barH = H * 0.7;
+    const barTop = H * 0.15;
+    const x = cliffLeft + 4;
+
+    // Background track
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(x, barTop, 4, barH);
+
+    // Filled portion
+    const fillH = barH * (altitude / SUMMIT_M);
+    const grad = ctx.createLinearGradient(0, barTop + barH, 0, barTop);
+    grad.addColorStop(0,   '#3388ff');
+    grad.addColorStop(0.6, '#00ccaa');
+    grad.addColorStop(1,   '#ffe060');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, barTop + barH - fillH, 4, fillH);
+
+    // Tick at summit
+    ctx.fillStyle = '#ffe060';
+    ctx.fillRect(x - 2, barTop, 8, 2);
+  }
+
+  // ── Main render loop ──────────────────────────────────────────────────────
+  function render(now) {
+    if (gameOver || summitReached) return;
+
+    const dt = Math.min((now - lastFrame) / 1000, 0.1);
+    lastFrame = now;
+
+    // Smooth scroll speed toward target
+    scrollSpeed = lerp(scrollSpeed, targetScroll, Math.min(1, dt * 2.5));
+    cliffScrollY += scrollSpeed * dt;
+
+    // Screen shake when stalling
+    if (lastWatts < 40 && lastWatts > 0) {
+      shakeX = (Math.random() - 0.5) * 7 * (1 - lastWatts / 40);
+      shakeY = (Math.random() - 0.5) * 4 * (1 - lastWatts / 40);
+    } else {
+      shakeX = lerp(shakeX, 0, 0.25);
+      shakeY = lerp(shakeY, 0, 0.25);
+    }
+
+    updateStorm(lastWatts, dt);
+
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+
+    drawCliff();
+    drawSky();
+    drawMountains();
+    drawParticles(lastWatts, dt);
+    drawProgressLine();
+    drawClimber();
+    drawStorm();
+
+    ctx.restore();
+
+    requestAnimationFrame(render);
+  }
+
+  // ── Summit & game over sequences ──────────────────────────────────────────
+  function triggerSummit() {
+    summitReached = true;
+    sdk.markComplete();         // also sets LED to green
+    document.getElementById('summit-overlay').classList.add('show');
+    document.getElementById('danger-bar').style.transform = 'scaleX(0)';
+    document.getElementById('danger-label').classList.remove('visible');
+  }
+
+  function triggerGameOver() {
+    gameOver = true;
+    sdk.quit();
+    // onSessionEnd will fire and show the end screen
+  }
+
+  // ── HUD update ────────────────────────────────────────────────────────────
+  function updateHUD() {
+    document.getElementById('altitude-display').textContent = `${Math.round(altitude)} / ${SUMMIT_M} m`;
+    document.getElementById('watts-display').textContent    = `${lastWatts} W`;
+    document.getElementById('spm-display').textContent      = `${lastSpm} SPM`;
+  }
+
+  // ── SDK ───────────────────────────────────────────────────────────────────
+  let sdk;
+
+  sdk = new ExperimentSDK({
+    onStroke: (data) => {
+      if (gameOver || summitReached) return;
+
+      lastWatts = data.watts;
+      lastSpm   = data.spm;
+
+      // Cliff scroll speed: excess watts above stall threshold
+      const effort = Math.max(0, data.watts - STALL_W);
+      targetScroll = (effort / (220 - STALL_W)) * MAX_SCROLL_PX_S;
+
+      // Altitude: each stroke advances based on watt output
+      const mPerStroke = Math.max(0, (data.watts - STALL_W) / 180) * 2.8;
+      altitude = Math.min(SUMMIT_M, altitude + mPerStroke);
+
+      updateHUD();
+
+      // LED colour feedback: orange=danger, blue=climbing, cyan=strong
+      if (data.watts < STORM_RISE_W) {
+        sdk.setLedPreset(5);  // orange — danger
+      } else if (data.watts >= 120) {
+        sdk.setLedPreset(2);  // cyan   — strong effort
+      } else {
+        sdk.setLedPreset(1);  // blue   — light effort
+      }
+
+      if (altitude >= SUMMIT_M && !summitReached) {
+        triggerSummit();
+      }
+    },
+
+    onInterval: (data) => {
+      if (!gameOver && !summitReached) {
+        // Keep watts/spm current even between strokes (machine polls at ~10 Hz;
+        // _latestData reflects the real-time reading, not just stroke peaks)
+        lastWatts = data.watts;
+        lastSpm   = data.spm;
+        updateHUD();
+
+        // Gently decay target speed between strokes so cliff slows if rowing stops
+        targetScroll = Math.max(0, targetScroll - 4);
+      }
+    },
+
+    onSessionEnd: (summary) => {
+      if (summitReached) return;
+      const endScreen = document.getElementById('end-screen');
+      endScreen.classList.add('show');
+      document.getElementById('end-stats').textContent =
+        `Reached ${Math.round(altitude)} m of ${SUMMIT_M} m · ${summary.total_strokes} strokes`;
+    },
+  });
+
+  // Connection status
+  window.addEventListener('connectionStatus', (e) => {
+    const el = document.getElementById('connection');
+    el.textContent = e.detail.connected ? '🟢 Connected' : '🔴 Disconnected';
+  });
+
+  // Rating — summit
+  let ratingDone = false;
+  document.querySelectorAll('#summit-rating .rating-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (ratingDone) return;
+      ratingDone = true;
+      document.querySelectorAll('#summit-rating .rating-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      await sdk.submitRating(parseInt(btn.dataset.rating));
+    });
+  });
+
+  // Rating — failure
+  document.querySelectorAll('#fail-rating .rating-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (ratingDone) return;
+      ratingDone = true;
+      document.querySelectorAll('#fail-rating .rating-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      await sdk.submitRating(parseInt(btn.dataset.rating));
+    });
+  });
+
+  // Init
+  resize();
+  initParticles();
+  requestAnimationFrame(render);
+</script>
+</body>
+</html>
