@@ -14,15 +14,5 @@ VALUES
     '{"type":"game","difficulty":"medium","tags":["power","target","interval"],"metric_weights":{"watts":0.5,"completion":0.3,"fun":0.2}}',
     'active',
     'human'
-  ),
-  (
-    'breathing-pacer',
-    'Ocean Row',
-    'A meditative rowing experience with breathing guidance, wave animation, and a day/night journey.',
-    'pacer',
-    '<meta http-equiv="refresh" content="0;url=/experiments/breathing-pacer/index.html">',
-    '{"type":"pacer","difficulty":"easy","tags":["breathing","recovery","mindful"],"metric_weights":{"duration":0.4,"completion":0.4,"fun":0.2}}',
-    'active',
-    'human'
   )
 ON CONFLICT (slug) DO NOTHING;

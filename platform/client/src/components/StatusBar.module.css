@@ -1,0 +1,45 @@
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  font-size: 0.82em;
+  z-index: 200;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.back {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.6;
+  transition: border-color 0.15s;
+  white-space: nowrap;
+}
+.back:hover { border-color: rgba(255, 255, 255, 0.7); }
+
+.dot { font-size: 0.75em; }
+.connected { color: #00ff64; }
+.disconnected { color: #555; }
+
+.spacer { flex: 1; }
+
+.stat {
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+}
+.stat small {
+  font-size: 0.8em;
+  opacity: 0.7;
+}

@@ -6,9 +6,368 @@ Use this skill when creating a new rowing machine experiment for the Clean Row p
 
 ## What an experiment is
 
-A single self-contained HTML file that turns live rowing data into an interactive experience. The rowing machine sends real-time `watts`, `spm` (strokes per minute), `strokeCount`, and `drag` at ~10 Hz. Your experiment listens to these via the SDK and does something compelling with them.
+A React component that turns live rowing data into an interactive experience. The rowing machine sends real-time `watts`, `spm` (strokes per minute), `strokeCount`, and `drag` at ~10 Hz via browser CustomEvents. Your experiment listens to these via the platform's hooks and renders something compelling.
 
-Experiments live in `platform/web/experiments/<slug>/index.html` and are served statically by nginx. They appear on the dashboard automatically once activated in the database.
+Experiments live in `platform/client/src/experiments/<slug>/index.jsx` and are registered in `ExperimentPage.jsx`. They appear on the dashboard automatically once activated in the database. The platform is built with Vite + React 18. Output is served statically by nginx from `platform/web/`.
+
+---
+
+## Project structure
+
+```
+platform/client/src/
+  experiments/<slug>/
+    index.jsx              ← your experiment component (required)
+    <Slug>.module.css      ← scoped styles
+  pixi/
+    index.js               ← barrel: { PixiStage, usePixi, usePixiTicker, usePixiApp }
+    PixiStage.jsx          ← full-screen Pixi canvas + PixiContext provider
+    usePixiApp.js          ← initialises Application, attaches canvas
+    usePixiTicker.js       ← per-frame game loop hook
+    PixiContext.js         ← app context + usePixi()
+  hooks/
+    useRowingData.js       ← onStroke / onInterval callbacks
+    useRowingConnection.js ← { connected, message }
+    useSession.js          ← session lifecycle (handled by ExperimentLayout)
+    useDevSimulator.js     ← auto-fires fake data in browser (handled by ExperimentLayout)
+  components/
+    ExperimentLayout.jsx   ← shell: StatusBar + RatingOverlay + session mgmt
+    StatusBar.jsx
+    RatingOverlay.jsx
+  pages/
+    ExperimentPage.jsx     ← lazy-loads experiment by slug
+    Dashboard.jsx
+  context/
+    RowingContext.jsx       ← { connected, sessionId, elapsedS, ended, markComplete, ... }
+```
+
+---
+
+## Experiment component contract
+
+Your experiment component receives **nothing via props**. All context comes from hooks:
+
+```jsx
+import { useRowing } from '../../context/RowingContext.jsx';
+import { useRowingData } from '../../hooks/useRowingData.js';
+
+export default function MyExperiment() {
+  const { markComplete, elapsedS, ended } = useRowing();
+
+  useRowingData({
+    onStroke: ({ watts, spm, strokeCount, drag }) => { /* update game */ },
+    onInterval: ({ watts, spm, drag })             => { /* 1s tick    */ },
+  });
+
+  // ... render
+}
+```
+
+`ExperimentLayout` (wrapping every experiment automatically via `ExperimentPage`) handles:
+- Starting the dev simulator in browser environments
+- Session creation on first stroke, stroke batching, session end
+- Rendering `<StatusBar>` and `<RatingOverlay>` (shown automatically when `ended === true`)
+- Back navigation
+
+**You do not need to manage sessions, connection state, or the back button yourself.**
+
+---
+
+## RowingContext values
+
+```js
+const {
+  connected,       // boolean — machine is connected
+  sessionId,       // string|null — UUID of current session (null before first stroke)
+  elapsedS,        // number — seconds since first stroke
+  ended,           // boolean — session has ended
+  completed,       // boolean — markComplete() was called
+  markComplete,    // () => void — call when goal is achieved
+  endSession,      // (opts?) => void — call to quit early
+  submitRating,    // (1-5) => Promise — called automatically by RatingOverlay
+} = useRowing();
+```
+
+---
+
+## useRowingData
+
+```js
+useRowingData({
+  // Fires on every rowingData CustomEvent (~10 Hz from machine / simulator)
+  onStroke: ({ watts, spm, strokeCount, drag }) => { },
+
+  // Fires every 1 second with latest reading
+  onInterval: ({ watts, spm, drag }) => { },
+});
+```
+
+Both callbacks are kept in refs internally — safe to define inline without triggering re-registrations.
+
+---
+
+## PixiJS base layer
+
+For GPU-accelerated, high-fidelity experiments use the pixi module. PixiJS v8 is already installed.
+
+### `<PixiStage>`
+
+Renders a full-screen canvas, initialises a PixiJS Application, and provides it via context. Children are only rendered once the app is ready.
+
+```jsx
+import { PixiStage, usePixi, usePixiTicker } from '../../pixi/index.js';
+
+export default function MyPixiExperiment() {
+  return (
+    <PixiStage pixiOptions={{ background: '#000011' }}>
+      <Scene />
+    </PixiStage>
+  );
+}
+
+function Scene() {
+  const app = usePixi(); // the live Application instance
+
+  useEffect(() => {
+    const sprite = new Sprite(texture);
+    app.stage.addChild(sprite);
+    return () => sprite.destroy();
+  }, [app]);
+
+  usePixiTicker((ticker) => {
+    // ticker.deltaTime ≈ 1 at 60 fps (frame-rate independent)
+  });
+
+  return null; // Pixi renders to canvas, not React DOM
+}
+```
+
+### `usePixiTicker(callback)`
+
+Registers a per-frame callback on `app.ticker`. `ticker.deltaTime` is frame-rate normalised (≈1 at 60 fps). Callback ref is always current — safe to define inline.
+
+### `usePixi()`
+
+Returns the initialised `Application` instance. Must be called inside a `<PixiStage>`.
+
+### `pixiOptions` props forward to `Application.init()`
+
+Common options: `background` (hex string or number), `antialias` (default true), `resolution` (default devicePixelRatio).
+
+---
+
+## Registering a new experiment
+
+### 1 — Create the component
+
+```
+platform/client/src/experiments/<slug>/index.jsx
+```
+
+### 2 — Register in ExperimentPage
+
+```js
+// platform/client/src/pages/ExperimentPage.jsx
+const EXPERIMENTS = {
+  'target-watts': lazy(() => import('../experiments/target-watts/index.jsx')),
+  'my-experiment': lazy(() => import('../experiments/my-experiment/index.jsx')), // ← add
+};
+```
+
+### 3 — Register in database
+
+```sql
+INSERT INTO experiments (id, slug, name, description, type, html_content, manifest, status, generated_by)
+VALUES (
+  gen_random_uuid(),
+  'my-experiment',
+  'My Experiment',
+  'One sentence pitch.',
+  'game',
+  '',
+  '{"type":"game","difficulty":"medium","tags":["power"]}',
+  'active',
+  'human'
+);
+```
+
+Or via API:
+
+```bash
+curl -X POST http://localhost:3000/api/experiments \
+  -H 'Content-Type: application/json' \
+  -d '{"slug":"my-experiment","name":"My Experiment","description":"...","type":"game","manifest":{"type":"game","difficulty":"medium","tags":["power"]}}'
+```
+
+### 4 — Build
+
+```bash
+cd platform/client && npm run build
+```
+
+Output lands in `platform/web/` (served by nginx at `localhost:3000`). For dev: `npm run dev` (runs on port 5173 with API proxy to `:8010`).
+
+---
+
+## Manifest fields
+
+```json
+{
+  "type": "game | pacer | challenge | meditation | race | rhythm",
+  "difficulty": "easy | medium | hard | brutal",
+  "tags": ["power", "interval", "breathing", "rhythm", "story", "compete"],
+  "metric_weights": {
+    "watts": 0.5,
+    "fun": 0.2,
+    "completion": 0.3
+  }
+}
+```
+
+`metric_weights` is optional but influences how the backend scores the experiment. Weights must sum to 1.0. Available keys: `watts`, `fun`, `completion`, `duration`.
+
+---
+
+## Scoring model
+
+The backend computes a `composite_score` (0–100) after every session ends, used to rank experiments on the dashboard:
+
+- **watts delta** (30%) — did the user push harder than their baseline?
+- **completion** (30%) — did the experiment reach `markComplete()`?
+- **duration delta** (20%) — did the user stay longer than their average?
+- **fun rating** (20%) — 1–5 stars submitted after the session
+
+Design accordingly: experiments that reward sustained effort, clear endpoints, and fun get ranked higher.
+
+---
+
+## Display context
+
+- **Screen**: 1920×1080, landscape, fullscreen (no title bar, no nav bar)
+- **Distance**: ~1.5m viewing distance from a rowing machine seat
+- **Input**: rowing data only — no touch, no keyboard during workout. Physical buttons via `buttonPress` events
+- **Font**: anything readable at distance; avoid tiny text
+- **Dark themes**: the dashboard is dark; matching the aesthetic is recommended
+
+```js
+// Physical button events (short/long press on machine buttons)
+window.addEventListener('buttonPress', (e) => {
+  if (e.detail.type === 'longPress') endSession();
+});
+```
+
+---
+
+## Creative direction
+
+### What already exists — do not duplicate the mechanic
+
+| Slug | Core mechanic |
+|---|---|
+| `target-watts` | Hit and hold watt targets in a vertical power bar; 8 progressive intervals |
+| `void-swarm`   | Auto-battler survival: endless enemy waves, watts drive hero speed + fire rate + spread shot; survive 5 min |
+
+- Another vertical bar or gauge as the primary feedback element
+- Another interval timer with rest periods (unless radically different)
+- Anything that doesn't visually respond to strokes — the display should feel alive
+
+### What is encouraged
+
+- **Narrative / story-driven**: each stroke advances a story, moves a character, or changes the world state
+- **Sound design** (Web Audio API): synthesise beats, ambient sound, or music that reacts to watt output
+- **Competitive / social**: ghost race against personal best from the DB, or a fictional opponent with a watt profile
+- **Physiological**: heart-rate zone trainer (estimated from watts/spm), lactate threshold intervals
+- **Abstract / generative art**: strokes drive particle systems, fractal growth, or procedural landscapes
+- **Adult/mature themes**: dark psychological challenges, explicit competition, brutal honesty about performance
+- **Punishment mechanics**: use `window.cleanRowBridge.postMessage` to set drag, raising resistance when underperforming
+- **Dual modes**: easy introduction phase that shifts into brutal hard mode after a threshold
+- **Humour**: absurd premises, self-deprecating commentary, surprise elements
+
+### Naming
+
+Names should be evocative and short (2–3 words). Avoid generic names like "Interval Trainer" or "Power Game". Examples of good names: *Void Runner*, *Pressure Drop*, *Dead Calm*, *Red Shift*, *The Climb*.
+
+---
+
+## Example skeleton — plain React (DOM-based)
+
+```jsx
+// platform/client/src/experiments/void-runner/index.jsx
+import { useState, useCallback } from 'react';
+import { useRowing } from '../../context/RowingContext.jsx';
+import { useRowingData } from '../../hooks/useRowingData.js';
+import styles from './VoidRunner.module.css';
+
+export default function VoidRunner() {
+  const { markComplete } = useRowing();
+  const [progress, setProgress] = useState(0);
+
+  const handleStroke = useCallback(({ watts }) => {
+    setProgress((p) => {
+      const next = p + watts * 0.01;
+      if (next >= 100) markComplete();
+      return Math.min(100, next);
+    });
+  }, [markComplete]);
+
+  useRowingData({ onStroke: handleStroke });
+
+  return (
+    <div className={styles.arena}>
+      <div className={styles.bar} style={{ width: `${progress}%` }} />
+    </div>
+  );
+}
+```
+
+---
+
+## Example skeleton — PixiJS (GPU-accelerated)
+
+```jsx
+// platform/client/src/experiments/red-shift/index.jsx
+import { useEffect, useCallback, useRef } from 'react';
+import { Graphics, Text } from 'pixi.js';
+import { PixiStage, usePixi, usePixiTicker } from '../../pixi/index.js';
+import { useRowing } from '../../context/RowingContext.jsx';
+import { useRowingData } from '../../hooks/useRowingData.js';
+
+export default function RedShift() {
+  return (
+    <PixiStage pixiOptions={{ background: '#0a0005' }}>
+      <Scene />
+    </PixiStage>
+  );
+}
+
+function Scene() {
+  const app = usePixi();
+  const { markComplete } = useRowing();
+  const stateRef = useRef({ speed: 0, distance: 0 });
+
+  useEffect(() => {
+    const g = new Graphics();
+    app.stage.addChild(g);
+    return () => g.destroy();
+  }, [app]);
+
+  useRowingData({
+    onStroke: useCallback(({ watts }) => {
+      stateRef.current.speed = watts / 200;
+    }, []),
+  });
+
+  usePixiTicker((ticker) => {
+    const s = stateRef.current;
+    s.distance += s.speed * ticker.deltaTime;
+    if (s.distance >= 1000) markComplete();
+    // update pixi display objects here
+  });
+
+  return null;
+}
+```
+
 
 ---
 
@@ -174,106 +533,10 @@ VALUES (
 );
 ```
 
-Or use the backend API:
+Or via API:
 
 ```bash
 curl -X POST http://localhost:3000/api/experiments \
   -H 'Content-Type: application/json' \
-  -d '{"slug":"my-experiment","name":"My Experiment","description":"...","type":"game","manifest":{"type":"game","difficulty":"medium","tags":["power"]}}'
-```
-
----
-
-## Creative direction
-
-### What already exists — do not duplicate the mechanic
-
-| Slug | Core mechanic |
-|---|---|
-| `target-watts` | Hit and hold watt targets in a vertical power bar; 8 progressive intervals |
-| `breathing-pacer` | Ocean scene; breathing orb expands/contracts; pace-guided meditation |
-
-### What to avoid
-
-- Another vertical bar or gauge as the primary feedback element
-- Another ocean/water theme
-- Another interval timer with rest periods (unless radically different)
-- Anything that doesn't visually respond to strokes — the display should feel alive
-
-### What is encouraged
-
-- **Narrative / story-driven**: each stroke advances a story, moves a character, or changes the world state
-- **Sound design** (Web Audio API): synthesise beats, ambient sound, or music that reacts to watt output
-- **Competitive / social**: ghost race against personal best from the DB, or a fictional opponent with a watt profile
-- **Physiological**: heart-rate zone trainer (estimated from watts/spm), lactate threshold intervals
-- **Abstract / generative art**: strokes drive particle systems, fractal growth, or procedural landscapes
-- **Adult/mature themes**: dark psychological challenges, explicit competition, brutal honesty about performance — no restrictions beyond basic good taste
-- **Punishment mechanics**: drag resistance controlled by the SDK can be raised when the user underperforms and lowered as reward
-- **Dual modes**: easy introduction phase that shifts into brutal hard mode after a threshold
-- **Humour**: absurd premises, self-deprecating commentary, surprise elements
-
-### Naming
-
-Names should be evocative and short (2–3 words). Avoid generic names like "Interval Trainer" or "Power Game". Examples of good names: *Void Runner*, *Pressure Drop*, *Dead Calm*, *Red Shift*, *The Climb*.
-
----
-
-## Example skeleton (minimal)
-
-```html
-<!-- manifest: {"type":"challenge","difficulty":"hard","tags":["power","story"]} -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Void Runner</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #000; color: #fff; height: 100vh; overflow: hidden; font-family: monospace; }
-  #hud {
-    position: fixed; top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between;
-    padding: 14px 20px; background: rgba(0,0,0,0.6); font-size: 0.85em;
-  }
-  /* ... */
-</style>
-</head>
-<body>
-<script src="/shared/nav.js"></script>
-
-<div id="hud">
-  <span id="connection">⚪ Connecting...</span>
-  <span id="elapsed">0:00</span>
-  <span id="watts-display">0W</span>
-</div>
-
-<!-- main canvas / DOM elements -->
-
-<script src="/sdk/experiment-sdk.js"></script>
-<script>
-  const sdk = new ExperimentSDK({
-    onStroke: ({ watts, spm, strokeNum, elapsedS }) => {
-      // update visuals
-    },
-    onInterval: ({ watts }, elapsedS) => {
-      document.getElementById('elapsed').textContent = fmt(elapsedS);
-      document.getElementById('watts-display').textContent = `${watts}W`;
-    },
-    onSessionEnd: (summary) => {
-      // show end screen, call sdk.submitRating() after user rates
-    },
-  });
-
-  window.addEventListener('connectionStatus', (e) => {
-    document.getElementById('connection').textContent =
-      e.detail.connected ? '🟢 Connected' : '🔴 Disconnected';
-  });
-
-  function fmt(s) {
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }
-</script>
-</body>
-</html>
+  -d '{"slug":"my-experiment","name":"My Experiment","description":"...","type":"game","html_content":"","manifest":{"type":"game","difficulty":"medium","tags":["power"]}}'
 ```

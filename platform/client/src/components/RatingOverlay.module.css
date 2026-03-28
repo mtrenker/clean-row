@@ -1,0 +1,73 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+  padding: 40px 48px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+.title {
+  font-size: 2em;
+  color: #f7cb15;
+  text-shadow: 0 0 20px #f7cb15;
+}
+
+.summary {
+  font-size: 0.95em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.prompt {
+  font-size: 1.1em;
+  opacity: 0.8;
+}
+
+.stars {
+  display: flex;
+  gap: 12px;
+}
+
+.star {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: #fff;
+  font-size: 1.3em;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.star:hover:not(:disabled) {
+  border-color: #f7cb15;
+  background: rgba(247, 203, 21, 0.15);
+}
+.star.selected {
+  background: #f7cb15;
+  border-color: #f7cb15;
+  color: #000;
+}
+.star:disabled {
+  cursor: default;
+}

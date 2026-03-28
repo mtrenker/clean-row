@@ -1,0 +1,119 @@
+.arena {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Full-screen flash overlay */
+.flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: flashOut 0.12s ease forwards;
+  z-index: 10;
+}
+.flash.hit  { background: rgba(0, 255, 100, 0.15); }
+.flash.miss { background: rgba(255, 50, 50, 0.1); }
+
+@keyframes flashOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Animated round / rest label */
+.phaseLabel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3em;
+  font-weight: bold;
+  text-shadow: 0 0 30px currentColor;
+  pointer-events: none;
+  animation: phaseFade 1.5s ease forwards;
+  z-index: 20;
+}
+@keyframes phaseFade {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.score {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.4em;
+  font-weight: bold;
+  color: #f7cb15;
+  text-shadow: 0 0 14px #f7cb15;
+}
+
+.roundTimer {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.9em;
+  opacity: 0.55;
+}
+
+/* ── Power bar + target zone ──────────────────────────────────────────── */
+.barSection {
+  position: relative;
+  width: 80px;
+  /* Fill most of the vertical space, minus score label above and watt label below */
+  height: calc(100% - 120px);
+  margin-top: 70px;
+}
+
+.barTrack {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.powerFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, #ff6b35, #f7cb15, #00ff64);
+  border-radius: 8px;
+  transition: height 0.08s ease;
+}
+
+.targetZone {
+  position: absolute;
+  left: calc(100% + 12px);
+  width: 90px;
+  background: rgba(0, 255, 100, 0.12);
+  border: 2px solid #00ff64;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72em;
+  color: #00ff64;
+  white-space: nowrap;
+  transition: bottom 0.25s ease, height 0.25s ease;
+}
+
+.wattLabel {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 2.2em;
+  font-weight: bold;
+  text-shadow: 0 0 16px rgba(255, 255, 255, 0.4);
+}

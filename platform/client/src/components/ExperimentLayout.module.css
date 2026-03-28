@@ -1,0 +1,14 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Offset the fixed StatusBar height so content isn't clipped under it */
+.main {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding-top: 44px; /* matches StatusBar height */
+}

@@ -93,7 +93,7 @@ echo "🔗 Configuring WebView URL..."
 # Override at deploy time with: PLATFORM_URL=http://myhost:3000/dashboard/index.html ./deploy.sh
 if [ -z "${PLATFORM_URL:-}" ]; then
     LAN_IP=$(hostname -I | awk '{print $1}')
-    PLATFORM_URL="http://${LAN_IP}:${WEB_PORT}/dashboard/index.html"
+    PLATFORM_URL="http://${LAN_IP}:${WEB_PORT}"
 fi
 PREFS_XML="<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map><string name=\"web_url\">${PLATFORM_URL}</string></map>"
 if echo "$PREFS_XML" | "$ADB_BIN" -s "$CONNECTED_SERIAL" shell run-as com.cleanrow.bridge tee /data/data/com.cleanrow.bridge/shared_prefs/CleanRowPrefs.xml >/dev/null 2>&1; then

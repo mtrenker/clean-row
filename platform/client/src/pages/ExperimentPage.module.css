@@ -1,0 +1,18 @@
+.loading,
+.notFound {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 1.1em;
+  opacity: 0.6;
+}
+
+.notFound a {
+  color: #00ff64;
+  text-decoration: none;
+  font-size: 0.85em;
+}
+.notFound a:hover { text-decoration: underline; }
