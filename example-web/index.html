@@ -230,6 +230,7 @@
                     <button onclick="clearCounter()">Clear Counter</button>
                     <button onclick="pauseWorkout()">Pause</button>
                     <button onclick="resumeWorkout()">Resume</button>
+                    <button onclick="toggleDisplay()">Toggle Display</button>
                     <button onclick="reloadPage()">Reload Page</button>
                     <button onclick="closeApp()">Close App</button>
                     <button onclick="restartApp()">Restart App</button>
@@ -320,6 +321,13 @@
             cleanRowBridge.postMessage({
                 type: 'command',
                 action: 'restartApp'
+            });
+        }
+
+        function toggleDisplay() {
+            cleanRowBridge.postMessage({
+                type: 'command',
+                action: 'toggleDisplay'
             });
         }
         

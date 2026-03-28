@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -38,6 +39,7 @@ class MainActivity :
 
     private var rowingService: RowingService? = null
     private var serviceBound = false
+    private var isDisplayDimmed = false
 
     private val serviceConnection =
             object : ServiceConnection {
@@ -263,6 +265,12 @@ class MainActivity :
         finishAffinity()
     }
 
+    override fun onToggleDisplay() {
+        Log.d(TAG, "Toggle display from web UI")
+        // Call the same logic as onLongPress
+        onLongPress()
+    }
+
     // ButtonReceiver.ButtonListener implementation
 
     override fun onShortPress() {
@@ -275,10 +283,89 @@ class MainActivity :
         Log.d(TAG, "Physical button long press")
         bridge.sendButtonEvent(true)
 
-        // Dim screen brightness to minimum (poweroff requires system permission)
-        window.attributes =
-                window.attributes.apply {
-                    screenBrightness = 0.01f // Near-black but not completely off
-                }
+        // Toggle display on/off
+        // Note: When off, press any volume rocker to wake the display
+        isDisplayDimmed = !isDisplayDimmed
+        val brightness = if (isDisplayDimmed) 0.0f else 1.0f
+        window.attributes = window.attributes.apply { screenBrightness = brightness }
+
+        // Also manage screen keep-on flag for better power savings
+        if (isDisplayDimmed) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            Log.d(TAG, "Display off, screen can sleep")
+        } else {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            Log.d(TAG, "Display on, keeping screen active")
+        }
+    }
+
+    // Key event handling for physical buttons and volume rockers
+    // Volume buttons: wake the display when dimmed (will not change volume in this state)
+    private var buttonPressTime = 0L
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d(TAG, "onKeyDown: keyCode=$keyCode, action=${event?.action}")
+
+        // Handle volume buttons to wake the screen if it's off
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            Log.d(TAG, "Volume button pressed")
+            if (isDisplayDimmed) {
+                // Wake the screen (restore brightness)
+                Log.d(TAG, "Screen is off, waking it with volume button")
+                isDisplayDimmed = false
+                window.attributes = window.attributes.apply { screenBrightness = 1.0f }
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Log.d(TAG, "Display restored via volume button")
+                return true // Consume the event so volume doesn't change
+            }
+            // If screen is already on, let volume button function normally
+            return false
+        }
+
+        // Check for common power/home button keycodes or custom button codes
+        if (keyCode == KeyEvent.KEYCODE_POWER ||
+                        keyCode == KeyEvent.KEYCODE_HOME ||
+                        keyCode == 229 || // Some devices use code 229
+                        keyCode == 119
+        ) { // Some devices use code 119
+
+            buttonPressTime = System.currentTimeMillis()
+            Log.d(TAG, "Button pressed, starting timer for long press detection")
+            return true
+        }
+
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d(TAG, "onKeyUp: keyCode=$keyCode")
+
+        // Volume buttons already handled in onKeyDown
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return isDisplayDimmed // Consume if screen was dimmed, otherwise let volume work
+        }
+
+        if (keyCode == KeyEvent.KEYCODE_POWER ||
+                        keyCode == KeyEvent.KEYCODE_HOME ||
+                        keyCode == 229 ||
+                        keyCode == 119
+        ) {
+
+            val pressDuration = System.currentTimeMillis() - buttonPressTime
+            Log.d(TAG, "Button released after ${pressDuration}ms")
+
+            if (pressDuration > 500) {
+                // Long press (> 500ms)
+                Log.d(TAG, "Long press detected via key event")
+                onLongPress()
+            } else {
+                // Short press
+                Log.d(TAG, "Short press detected via key event")
+                onShortPress()
+            }
+            return true
+        }
+
+        return super.onKeyUp(keyCode, event)
     }
 }

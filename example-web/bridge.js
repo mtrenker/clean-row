@@ -198,6 +198,17 @@ const CleanRowAPI = {
             type: 'command',
             action: 'restartApp'
         });
+    },
+
+    /**
+     * Toggle the display on/off (dims or restores brightness).
+     * When dimmed, press any volume button to wake the screen.
+     */
+    toggleDisplay() {
+        cleanRowBridge.postMessage({
+            type: 'command',
+            action: 'toggleDisplay'
+        });
     }
 };
 

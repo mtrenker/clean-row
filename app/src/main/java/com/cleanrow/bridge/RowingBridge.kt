@@ -31,6 +31,7 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
         fun onReloadPage()
         fun onRestartApp()
         fun onCloseApp()
+        fun onToggleDisplay()
     }
 
     /** Initialize the bridge using modern WebMessageListener API. */
@@ -122,6 +123,9 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
                 }
                 "closeApp" -> {
                     commandHandler.onCloseApp()
+                }
+                "toggleDisplay" -> {
+                    commandHandler.onToggleDisplay()
                 }
                 else -> {
                     Log.w(TAG, "Unknown action: $action")
