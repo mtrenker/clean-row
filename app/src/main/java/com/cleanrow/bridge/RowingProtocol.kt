@@ -111,29 +111,68 @@ object RowingProtocol {
         return buildPacket(CAT_COUNTER, CMD_CLEAR_COUNTER, byteArrayOf(0x00, 0x00))
     }
 
-    /** Parse a 29-byte response packet into RowingState. */
-    fun parseResponse(buffer: ByteArray): RowingState? {
-        if (buffer.size < 29) {
-            Log.w(TAG, "Response too short: ${buffer.size} bytes")
+    /**
+     * Find the start offset of a valid packet in the buffer. Validates header, end byte, and
+     * checksum. Returns -1 if no valid packet found.
+     */
+    fun findPacketStart(buffer: ByteArray, bytesRead: Int): Int {
+        var i = 0
+        while (i <=
+                bytesRead - 7) { // minimum packet size is 7 (header+cat+cmd+len+0data+checksum+end)
+            if (buffer[i] == HEADER_1 && i + 1 < bytesRead && buffer[i + 1] == HEADER_2) {
+                if (i + 4 >= bytesRead) break
+                val dataLen = buffer[i + 4].toInt() and 0xFF
+                val totalLen = dataLen + 7
+                if (i + totalLen > bytesRead) {
+                    i++
+                    continue
+                }
+
+                // Check end byte
+                if (buffer[i + totalLen - 1] != END_BYTE) {
+                    i++
+                    continue
+                }
+
+                // Validate checksum (XOR of bytes from category through last data byte)
+                var checksum: Byte = 0
+                for (j in (i + 2) until (i + 5 + dataLen)) {
+                    checksum = (checksum.toInt() xor buffer[j].toInt()).toByte()
+                }
+                if (checksum == buffer[i + 5 + dataLen]) {
+                    return i
+                }
+                Log.w(TAG, "Checksum mismatch at offset $i")
+            }
+            i++
+        }
+        return -1
+    }
+
+    /** Parse a response packet into RowingState. Scans for a valid packet in the buffer. */
+    fun parseResponse(buffer: ByteArray, bytesRead: Int): RowingState? {
+        val offset = findPacketStart(buffer, bytesRead)
+        if (offset < 0) {
+            Log.w(TAG, "No valid packet found in $bytesRead bytes")
             return null
         }
 
-        // Verify header
-        if (buffer[0] != HEADER_1 || buffer[1] != HEADER_2) {
-            Log.w(TAG, "Invalid header: ${buffer[0].toHex()} ${buffer[1].toHex()}")
+        val dataLen = buffer[offset + 4].toInt() and 0xFF
+        if (dataLen < 18) { // need at least 18 data bytes for rowing state (through key duration)
+            Log.w(TAG, "Packet data too short for rowing state: $dataLen bytes")
             return null
         }
 
         return try {
             RowingState(
-                    errorFlags = buffer[10].toInt() and 0xFF,
-                    drag = buffer.readUInt16(11),
-                    rpm = buffer.readUInt16(13),
-                    watts = buffer.readUInt16(15),
-                    spm = buffer.readUInt16(17),
-                    strokeCount = buffer.readUInt16(19),
-                    buttonPressed = buffer[21].toInt() == 0xFF,
-                    buttonDuration = buffer[22].toInt() and 0xFF
+                    errorFlags = buffer[offset + 10].toInt() and 0xFF,
+                    drag = buffer.readUInt16(offset + 11),
+                    rpm = buffer.readUInt16(offset + 13),
+                    watts = buffer.readUInt16(offset + 15),
+                    spm = buffer.readUInt16(offset + 17),
+                    strokeCount = buffer.readUInt16(offset + 19),
+                    buttonPressed = buffer[offset + 21].toInt() == 0xFF,
+                    buttonDuration = buffer[offset + 22].toInt() and 0xFF
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing response", e)

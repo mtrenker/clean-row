@@ -6,20 +6,19 @@ import java.io.InputStream
 import java.io.OutputStream
 
 /**
- * Serial port interface wrapper for /dev/ttyS2 communication.
- * Uses android-serialport-api library.
+ * Serial port interface wrapper for /dev/ttyS2 communication. Uses android-serialport-api library.
  */
 class SerialInterface {
     private var serialPort: android_serialport_api.SerialPort? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
-    
+
     companion object {
         private const val TAG = "SerialInterface"
         private const val DEVICE_PATH = "/dev/ttyS2"
         private const val BAUD_RATE = 19200
     }
-    
+
     /**
      * Open the serial port connection.
      * @return true if successful, false otherwise
@@ -27,17 +26,17 @@ class SerialInterface {
     fun open(): Boolean {
         return try {
             Log.d(TAG, "Opening serial port: $DEVICE_PATH at $BAUD_RATE baud")
-            
+
             val device = File(DEVICE_PATH)
             if (!device.exists()) {
                 Log.e(TAG, "Serial device not found: $DEVICE_PATH")
                 return false
             }
-            
+
             serialPort = android_serialport_api.SerialPort(device, BAUD_RATE, 0)
             inputStream = serialPort?.inputStream
             outputStream = serialPort?.outputStream
-            
+
             Log.d(TAG, "Serial port opened successfully")
             true
         } catch (e: Exception) {
@@ -45,10 +44,8 @@ class SerialInterface {
             false
         }
     }
-    
-    /**
-     * Close the serial port connection.
-     */
+
+    /** Close the serial port connection. */
     fun close() {
         try {
             inputStream?.close()
@@ -63,7 +60,7 @@ class SerialInterface {
             serialPort = null
         }
     }
-    
+
     /**
      * Write data to serial port.
      * @param data Byte array to send
@@ -80,7 +77,7 @@ class SerialInterface {
             false
         }
     }
-    
+
     /**
      * Read data from serial port.
      * @param buffer Buffer to read into
@@ -90,13 +87,12 @@ class SerialInterface {
     fun read(buffer: ByteArray, timeout: Int = 1000): Int {
         return try {
             val stream = inputStream ?: return -1
-            
+
             // Non-blocking read with timeout
             val startTime = System.currentTimeMillis()
             var totalRead = 0
-            
-            while (totalRead < buffer.size && 
-                   (System.currentTimeMillis() - startTime) < timeout) {
+
+            while (totalRead < buffer.size && (System.currentTimeMillis() - startTime) < timeout) {
                 if (stream.available() > 0) {
                     val bytesToRead = minOf(stream.available(), buffer.size - totalRead)
                     val bytesRead = stream.read(buffer, totalRead, bytesToRead)
@@ -107,20 +103,41 @@ class SerialInterface {
                     Thread.sleep(10) // Small delay to avoid busy-waiting
                 }
             }
-            
+
             if (totalRead > 0) {
-                Log.d(TAG, "Read $totalRead bytes: ${buffer.take(totalRead).joinToString(" ") { "%02X".format(it) }}")
+                Log.d(
+                        TAG,
+                        "Read $totalRead bytes: ${buffer.take(totalRead).joinToString(" ") { "%02X".format(it) }}"
+                )
             }
-            
+
             totalRead
         } catch (e: Exception) {
             Log.e(TAG, "Failed to read from serial port", e)
             -1
         }
     }
-    
+
     /**
-     * Check if serial port is open.
+     * Drain all pending bytes from the input buffer. Call before sending a query to discard
+     * stale/unsolicited data.
      */
+    fun drain() {
+        try {
+            val stream = inputStream ?: return
+            var drained = 0
+            while (stream.available() > 0) {
+                val skipped = stream.read(ByteArray(minOf(stream.available(), 512)))
+                if (skipped > 0) drained += skipped
+            }
+            if (drained > 0) {
+                Log.d(TAG, "Drained $drained stale bytes")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error draining serial port", e)
+        }
+    }
+
+    /** Check if serial port is open. */
     fun isOpen(): Boolean = serialPort != null && inputStream != null && outputStream != null
 }
