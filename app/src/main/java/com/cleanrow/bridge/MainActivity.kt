@@ -140,7 +140,8 @@ class MainActivity :
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         Log.d(TAG, "Page loaded: $url")
-                        // Re-send connection status so experiment pages don't stay at "Connecting..."
+                        // Re-send connection status so experiment pages don't stay at
+                        // "Connecting..."
                         lastConnectionStatus?.let { (connected, message) ->
                             bridge.sendConnectionStatus(connected, message)
                         }

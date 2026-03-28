@@ -4,10 +4,10 @@
  * Include as the first <script> in <body>.
  */
 (function () {
-  const DASHBOARD_URL = '/dashboard/index.html';
+    const DASHBOARD_URL = '/dashboard/index.html';
 
-  const style = document.createElement('style');
-  style.textContent = `
+    const style = document.createElement('style');
+    style.textContent = `
     .nav-back-btn {
       background: none;
       border: 1px solid rgba(255,255,255,0.25);
@@ -25,30 +25,30 @@
       color: #fff;
     }
   `;
-  document.head.appendChild(style);
+    document.head.appendChild(style);
 
-  function injectButton() {
-    const bar = document.getElementById('status-bar') || document.getElementById('hud');
-    if (!bar) return;
+    function injectButton() {
+        const bar = document.getElementById('status-bar') || document.getElementById('hud');
+        if (!bar) return;
 
-    const btn = document.createElement('button');
-    btn.className = 'nav-back-btn';
-    btn.textContent = '← Dashboard';
-    btn.addEventListener('click', () => {
-      // End the active SDK session (sendBeacon fires on pagehide automatically,
-      // but calling quit() first marks it completed=false cleanly)
-      if (window.cleanRowSDK) {
-        window.cleanRowSDK.quit();
-      }
-      window.location.href = DASHBOARD_URL;
-    });
+        const btn = document.createElement('button');
+        btn.className = 'nav-back-btn';
+        btn.textContent = '← Dashboard';
+        btn.addEventListener('click', () => {
+            // End the active SDK session (sendBeacon fires on pagehide automatically,
+            // but calling quit() first marks it completed=false cleanly)
+            if (window.cleanRowSDK) {
+                window.cleanRowSDK.quit();
+            }
+            window.location.href = DASHBOARD_URL;
+        });
 
-    bar.insertBefore(btn, bar.firstChild);
-  }
+        bar.insertBefore(btn, bar.firstChild);
+    }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', injectButton);
-  } else {
-    injectButton();
-  }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', injectButton);
+    } else {
+        injectButton();
+    }
 })();
