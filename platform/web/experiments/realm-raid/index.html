@@ -1,0 +1,718 @@
+<!-- manifest: {"type":"game","difficulty":"medium","tags":["rpg","battler","pixi"],"metric_weights":{"watts":0.4,"completion":0.4,"fun":0.2}} -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Realm Raid</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+  }
+  canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+  #connection {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.85em;
+    background: rgba(0,0,0,0.6);
+    padding: 6px 18px;
+    border-radius: 20px;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  /* Left stat panel */
+  #stats {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    background: rgba(0,0,0,0.6);
+    padding: 12px 18px;
+    border-radius: 14px;
+    min-width: 110px;
+  }
+  .stat-label { font-size: 0.65em; color: #888; text-transform: uppercase; letter-spacing: 0.1em; }
+  .stat-value { font-size: 2em; font-weight: bold; line-height: 1.1; }
+  #watts-val { color: #ffcc44; }
+  #spm-val   { color: #44aaff; }
+  /* Right: wave info */
+  #wave-panel {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: rgba(0,0,0,0.6);
+    padding: 12px 18px;
+    border-radius: 14px;
+    text-align: right;
+    min-width: 110px;
+  }
+  #wave-label { font-size: 0.65em; color: #888; text-transform: uppercase; letter-spacing: 0.1em; }
+  #wave-value { font-size: 2em; font-weight: bold; color: #fff; line-height: 1.1; }
+  /* Bottom: message banner */
+  #banner {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.75);
+    padding: 14px 36px;
+    border-radius: 20px;
+    font-size: 1.4em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  /* Rating screen */
+  #rating-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 20;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    pointer-events: all;
+  }
+  #rating-screen h2 { font-size: 2em; color: #ffcc44; }
+  #rating-screen p  { color: #aaa; }
+  #stars { display: flex; gap: 16px; }
+  .star-btn {
+    font-size: 2.5em;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #555;
+    transition: color 0.15s, transform 0.1s;
+  }
+  .star-btn:hover { color: #ffcc44; transform: scale(1.2); }
+</style>
+</head>
+<body>
+<script src="/shared/nav.js"></script>
+<div id="hud">
+  <div id="connection">⚪ Connecting...</div>
+  <div id="stats">
+    <div class="stat-label">Watts</div>
+    <div class="stat-value" id="watts-val">0</div>
+    <div class="stat-label" style="margin-top:8px">SPM</div>
+    <div class="stat-value" id="spm-val">0</div>
+  </div>
+  <div id="wave-panel">
+    <div id="wave-label">Wave</div>
+    <div class="stat-value" id="wave-value">1 / 5</div>
+  </div>
+  <div id="banner"></div>
+</div>
+<div id="rating-screen">
+  <h2>⚔️ Realm Cleared!</h2>
+  <p>How fun was this workout?</p>
+  <div id="stars">
+    <button class="star-btn" data-r="1">★</button>
+    <button class="star-btn" data-r="2">★</button>
+    <button class="star-btn" data-r="3">★</button>
+    <button class="star-btn" data-r="4">★</button>
+    <button class="star-btn" data-r="5">★</button>
+  </div>
+</div>
+
+<script src="/shared/pixi.min.js"></script>
+<script src="/sdk/experiment-sdk.js"></script>
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const TOTAL_WAVES   = 5;
+const CANVAS_W      = window.innerWidth;
+const CANVAS_H      = window.innerHeight;
+const HERO_X_BASE   = CANVAS_W * 0.22;
+const ENEMY_X_BASE  = CANVAS_W * 0.75;
+const MID_Y         = CANVAS_H / 2;
+
+// ─── PixiJS App ───────────────────────────────────────────────────────────────
+const app = new PIXI.Application({
+  width: CANVAS_W,
+  height: CANVAS_H,
+  backgroundColor: 0x0a0a1a,
+  antialias: true,
+  resolution: window.devicePixelRatio || 1,
+  autoDensity: true,
+});
+document.body.appendChild(app.view);
+app.view.style.position = 'fixed';
+app.view.style.top = '0';
+app.view.style.left = '0';
+
+// ─── Layers ───────────────────────────────────────────────────────────────────
+const bgLayer   = new PIXI.Container();
+const mainLayer = new PIXI.Container();
+const fxLayer   = new PIXI.Container();
+app.stage.addChild(bgLayer, mainLayer, fxLayer);
+
+// ─── Background ───────────────────────────────────────────────────────────────
+const bgRect = new PIXI.Graphics();
+bgRect.beginFill(0x0a0a1a);
+bgRect.drawRect(0, 0, CANVAS_W, CANVAS_H);
+bgRect.endFill();
+bgLayer.addChild(bgRect);
+
+// Arena divider line
+const divider = new PIXI.Graphics();
+divider.lineStyle(2, 0x333355, 1);
+divider.moveTo(CANVAS_W / 2, 60);
+divider.lineTo(CANVAS_W / 2, CANVAS_H - 40);
+bgLayer.addChild(divider);
+
+// Ground strip
+const ground = new PIXI.Graphics();
+ground.beginFill(0x111128, 1);
+ground.drawRect(0, CANVAS_H * 0.72, CANVAS_W, CANVAS_H * 0.28);
+ground.endFill();
+bgLayer.addChild(ground);
+
+// Stars
+for (let i = 0; i < 60; i++) {
+  const star = new PIXI.Graphics();
+  star.beginFill(0xffffff, Math.random() * 0.6 + 0.1);
+  star.drawCircle(0, 0, Math.random() * 1.2 + 0.3);
+  star.endFill();
+  star.x = Math.random() * CANVAS_W;
+  star.y = Math.random() * CANVAS_H * 0.65;
+  bgLayer.addChild(star);
+}
+
+// Castle keep outline (right-hand backdrop)
+function drawCastle() {
+  const c = new PIXI.Graphics();
+  const cx = CANVAS_W * 0.88, cy = CANVAS_H * 0.5;
+  c.beginFill(0x1a1a2e); c.lineStyle(2, 0x2233aa);
+  c.drawRect(cx - 50, cy - 120, 100, 140); c.endFill();
+  // Battlements
+  for (let i = 0; i < 5; i++) {
+    c.beginFill(0x1a1a2e); c.lineStyle(2, 0x2233aa);
+    c.drawRect(cx - 52 + i * 24, cy - 140, 16, 22); c.endFill();
+  }
+  // Tower
+  c.beginFill(0x111126); c.lineStyle(2, 0x2233aa);
+  c.drawRect(cx - 20, cy - 180, 40, 62); c.endFill();
+  bgLayer.addChild(c);
+}
+drawCastle();
+
+// Hero camp tent (left backdrop)
+function drawTent() {
+  const g = new PIXI.Graphics();
+  const tx = CANVAS_W * 0.1, ty = CANVAS_H * 0.55;
+  g.beginFill(0x22113a); g.lineStyle(2, 0x553388);
+  g.drawPolygon([tx, ty, tx + 60, ty - 70, tx + 120, ty]);
+  g.endFill();
+  g.beginFill(0x1a0d2e);
+  g.drawRect(tx + 42, ty - 30, 36, 30); // door
+  g.endFill();
+  bgLayer.addChild(g);
+}
+drawTent();
+
+// ─── Hero Helper ──────────────────────────────────────────────────────────────
+const HERO_DEFS = [
+  { name: 'Knight', color: 0x4488ff, accentColor: 0xaaccff, baseDmg: 18, baseCD: 2.8 },
+  { name: 'Mage',   color: 0xcc44ff, accentColor: 0xeebfff, baseDmg: 28, baseCD: 4.0 },
+  { name: 'Archer', color: 0x44ffaa, accentColor: 0xccffee, baseDmg: 12, baseCD: 1.6 },
+];
+
+function drawHeroSprite(g, color, accent) {
+  g.clear();
+  // Body
+  g.beginFill(color);
+  g.drawRoundedRect(-16, -38, 32, 44, 6);
+  g.endFill();
+  // Head
+  g.beginFill(accent);
+  g.drawCircle(0, -52, 14);
+  g.endFill();
+  // Shield/accent
+  g.beginFill(accent, 0.4);
+  g.drawRect(-18, -28, 8, 28);
+  g.endFill();
+  // Legs
+  g.beginFill(color);
+  g.drawRect(-13, 6, 10, 18);
+  g.drawRect(4, 6, 10, 18);
+  g.endFill();
+}
+
+function drawEnemySprite(g, color, size) {
+  g.clear();
+  const s = size;
+  // Body — menacing diamond shape
+  g.beginFill(color);
+  g.drawPolygon([0, -s * 0.9, s * 0.55, 0, 0, s * 0.55, -s * 0.55, 0]);
+  g.endFill();
+  // Eye
+  g.beginFill(0xff2222);
+  g.drawCircle(0, -s * 0.3, s * 0.18);
+  g.endFill();
+  g.beginFill(0x000000);
+  g.drawCircle(0, -s * 0.3, s * 0.08);
+  g.endFill();
+}
+
+function drawBossSprite(g, color, phase) {
+  g.clear();
+  const s = 60;
+  // Outer ring
+  g.lineStyle(4, color, 0.6);
+  g.drawCircle(0, 0, s + 12);
+  g.lineStyle(0);
+  // Body
+  g.beginFill(color);
+  g.drawRegularPolygon ? g.drawRegularPolygon(0, 0, s, 6) : g.drawCircle(0, 0, s);
+  g.endFill();
+  // Core
+  g.beginFill(0xffffff, 0.3);
+  g.drawCircle(0, 0, s * 0.35);
+  g.endFill();
+  // Eyes
+  const eyeColors = [0xff0000, 0xff6600, 0xffff00];
+  g.beginFill(eyeColors[phase] || 0xff0000);
+  g.drawCircle(-18, -10, 10);
+  g.drawCircle(18, -10, 10);
+  g.endFill();
+}
+
+// ─── Game State ───────────────────────────────────────────────────────────────
+let currentWatts = 0;
+let currentSpm   = 20;
+let waveNum      = 1;
+let gameOver     = false;
+let sessionDone  = false;
+const WAVE_COLORS = [0x2244aa, 0x4422aa, 0xaa4422, 0xaa2244, 0xff2200];
+const WAVE_ENEMY_COLORS = [0x6644cc, 0xcc4466, 0xff6622, 0xff2244, 0x8800ff];
+
+// Heroes
+const heroes = HERO_DEFS.map((def, i) => {
+  const yPos = MID_Y - 80 + i * 90;
+  const g = new PIXI.Graphics();
+  drawHeroSprite(g, def.color, def.accentColor);
+  g.x = HERO_X_BASE;
+  g.y = yPos;
+  mainLayer.addChild(g);
+
+  // HP bar
+  const hpTrack = new PIXI.Graphics();
+  hpTrack.beginFill(0x333333); hpTrack.drawRoundedRect(-30, 28, 60, 8, 4); hpTrack.endFill();
+  g.addChild(hpTrack);
+  const hpFill = new PIXI.Graphics();
+  hpFill.beginFill(def.color); hpFill.drawRoundedRect(-30, 28, 60, 8, 4); hpFill.endFill();
+  g.addChild(hpFill);
+
+  // Name label
+  const label = new PIXI.Text(def.name, { fontFamily: 'Courier New', fontSize: 11, fill: def.accentColor });
+  label.anchor.set(0.5, 0); label.x = 0; label.y = 38;
+  g.addChild(label);
+
+  return {
+    gfx: g, hpFill,
+    name: def.name, color: def.color, accentColor: def.accentColor,
+    baseDmg: def.baseDmg, baseCD: def.baseCD,
+    maxHp: 300, hp: 300,
+    cdTimer: Math.random() * def.baseCD,
+    yPos,
+    alive: true,
+  };
+});
+
+// Enemy pool
+let enemies = [];
+let bossMode = false;
+let bossGfx  = null;
+let bossHp   = 0, bossMaxHp = 0;
+let bossPhase = 0;
+
+// ─── Enemy / Boss creation ────────────────────────────────────────────────────
+function spawnWave(wave) {
+  // Clear old
+  enemies.forEach(e => mainLayer.removeChild(e.gfx));
+  enemies = [];
+  bossMode = false;
+  if (bossGfx) { mainLayer.removeChild(bossGfx); bossGfx = null; }
+
+  if (wave === 5) {
+    // Boss
+    bossMode = true;
+    bossMaxHp = 1200; bossHp = bossMaxHp; bossPhase = 0;
+    bossGfx = new PIXI.Graphics();
+    drawBossSprite(bossGfx, WAVE_ENEMY_COLORS[4], 0);
+    bossGfx.x = ENEMY_X_BASE; bossGfx.y = MID_Y;
+    mainLayer.addChild(bossGfx);
+
+    // Boss HP bar (wide)
+    const bossTrack = new PIXI.Graphics();
+    bossTrack.beginFill(0x333333);
+    bossTrack.drawRoundedRect(-90, 80, 180, 12, 6);
+    bossTrack.endFill();
+    bossGfx.addChild(bossTrack);
+    const bossFill = new PIXI.Graphics();
+    bossFill.beginFill(0xff2200);
+    bossFill.drawRoundedRect(-90, 80, 180, 12, 6);
+    bossFill.endFill();
+    bossGfx.addChild(bossFill);
+    bossGfx._fill = bossFill;
+    bossGfx._track = bossTrack;
+
+    const bossLabel = new PIXI.Text('THE DARK OVERLORD', { fontFamily: 'Courier New', fontSize: 14, fill: 0xff6644, fontWeight: 'bold' });
+    bossLabel.anchor.set(0.5, 0); bossLabel.x = 0; bossLabel.y = 96;
+    bossGfx.addChild(bossLabel);
+
+    showBanner('🔥 BOSS BATTLE!', '#ff3300');
+    sdk.setLedPreset(6);
+    return;
+  }
+
+  const count   = 2 + wave;                     // 3 on w1, 4 on w2, etc.
+  const enemyHp = 60 + wave * 30;               // scales with wave
+  const spread  = Math.min(count - 1, 4) * 60;
+  const startY  = MID_Y - spread / 2;
+
+  for (let i = 0; i < count; i++) {
+    const g = new PIXI.Graphics();
+    const size = 22 + wave * 3;
+    drawEnemySprite(g, WAVE_ENEMY_COLORS[wave - 1], size);
+    g.x = ENEMY_X_BASE + (Math.random() - 0.5) * 60;
+    g.y = startY + i * (spread / Math.max(count - 1, 1));
+    mainLayer.addChild(g);
+
+    // HP bar
+    const track = new PIXI.Graphics();
+    track.beginFill(0x333333); track.drawRoundedRect(-24, size + 8, 48, 7, 3); track.endFill();
+    g.addChild(track);
+    const fill = new PIXI.Graphics();
+    fill.beginFill(WAVE_ENEMY_COLORS[wave - 1]); fill.drawRoundedRect(-24, size + 8, 48, 7, 3); fill.endFill();
+    g.addChild(fill);
+
+    enemies.push({ gfx: g, fill, maxHp: enemyHp, hp: enemyHp, alive: true, size });
+  }
+
+  if (wave <= 2) sdk.setLedPreset(1);
+  else           sdk.setLedPreset(5);
+}
+
+// ─── FX ───────────────────────────────────────────────────────────────────────
+const particles = [];
+
+function spawnProjectile(fromX, fromY, toX, toY, color) {
+  const g = new PIXI.Graphics();
+  g.beginFill(color); g.drawCircle(0, 0, 5); g.endFill();
+  g.x = fromX; g.y = fromY;
+  fxLayer.addChild(g);
+
+  const dx = toX - fromX, dy = toY - fromY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const speed = 420; // px/s
+  const vx = (dx / dist) * speed;
+  const vy = (dy / dist) * speed;
+  const ttl = dist / speed;
+
+  particles.push({ gfx: g, vx, vy, life: ttl, maxLife: ttl, type: 'proj' });
+}
+
+function spawnDamageNumber(x, y, dmg, color) {
+  const t = new PIXI.Text(`-${Math.round(dmg)}`, {
+    fontFamily: 'Courier New', fontSize: 18, fill: color, fontWeight: 'bold',
+  });
+  t.anchor.set(0.5, 1);
+  t.x = x + (Math.random() - 0.5) * 30;
+  t.y = y;
+  fxLayer.addChild(t);
+  particles.push({ gfx: t, vx: (Math.random() - 0.5) * 30, vy: -70, life: 1.0, maxLife: 1.0, type: 'dmgNum' });
+}
+
+function spawnExplosion(x, y, color) {
+  for (let i = 0; i < 8; i++) {
+    const g = new PIXI.Graphics();
+    g.beginFill(color, 1); g.drawCircle(0, 0, 6 + Math.random() * 6); g.endFill();
+    g.x = x; g.y = y;
+    fxLayer.addChild(g);
+    const angle = (Math.PI * 2 * i) / 8 + Math.random() * 0.4;
+    const spd   = 80 + Math.random() * 100;
+    particles.push({ gfx: g, vx: Math.cos(angle) * spd, vy: Math.sin(angle) * spd, life: 0.6, maxLife: 0.6, type: 'spark' });
+  }
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      fxLayer.removeChild(p.gfx);
+      particles.splice(i, 1);
+      continue;
+    }
+    const progress = p.life / p.maxLife;
+    p.gfx.x += p.vx * dt;
+    p.gfx.y += p.vy * dt;
+    if (p.type === 'proj' || p.type === 'spark') {
+      p.gfx.alpha = progress;
+    } else if (p.type === 'dmgNum') {
+      p.gfx.alpha = progress;
+      p.gfx.scale.set(0.7 + 0.3 * (1 - progress));
+    }
+  }
+}
+
+// ─── Background pulse ─────────────────────────────────────────────────────────
+let bgHue = 0;
+let bgPulse = 0;
+
+function updateBackground(dt) {
+  bgPulse += dt * 0.8;
+  const intensity = Math.min(currentWatts / 200, 1);
+  const r = Math.round(10 + intensity * 15 + Math.sin(bgPulse) * 4);
+  const g = Math.round(10 + intensity * 2);
+  const b = Math.round(26 + intensity * 10);
+  bgRect.clear();
+  bgRect.beginFill(PIXI.utils.rgb2hex([r / 255, g / 255, b / 255]));
+  bgRect.drawRect(0, 0, CANVAS_W, CANVAS_H);
+  bgRect.endFill();
+}
+
+// ─── Hero HP update ───────────────────────────────────────────────────────────
+function updateHeroHpBars() {
+  heroes.forEach(h => {
+    const frac = Math.max(0, h.hp / h.maxHp);
+    h.hpFill.clear();
+    h.hpFill.beginFill(h.color);
+    h.hpFill.drawRoundedRect(-30, 28, 60 * frac, 8, 4);
+    h.hpFill.endFill();
+  });
+}
+
+// ─── Enemy HP update ─────────────────────────────────────────────────────────
+function updateEnemyHpBar(e) {
+  const frac = Math.max(0, e.hp / e.maxHp);
+  e.fill.clear();
+  e.fill.beginFill(WAVE_ENEMY_COLORS[waveNum - 1]);
+  e.fill.drawRoundedRect(-24, e.size + 8, 48 * frac, 7, 3);
+  e.fill.endFill();
+}
+
+// Boss HP update
+function updateBossHpBar() {
+  if (!bossGfx) return;
+  const frac = Math.max(0, bossHp / bossMaxHp);
+  const newPhase = frac > 0.66 ? 0 : frac > 0.33 ? 1 : 2;
+  if (newPhase !== bossPhase) {
+    bossPhase = newPhase;
+    drawBossSprite(bossGfx, WAVE_ENEMY_COLORS[4], bossPhase);
+    // Re-add HP bar children after redraw
+    const track = bossGfx._track, fill = bossGfx._fill;
+    bossGfx.addChild(track); bossGfx.addChild(fill);
+    const label = new PIXI.Text('THE DARK OVERLORD', { fontFamily: 'Courier New', fontSize: 14, fill: 0xff6644, fontWeight: 'bold' });
+    label.anchor.set(0.5, 0); label.x = 0; label.y = 96;
+    bossGfx.addChild(label);
+    spawnExplosion(bossGfx.x, bossGfx.y, [0xffaa00, 0xff6600, 0xff2200][bossPhase]);
+    showBanner(['💀 Boss Enraged!', '🔥 Last Stand!'][bossPhase - 1] || '🔥 Last Stand!', '#ff6600');
+  }
+  bossGfx._fill.clear();
+  bossGfx._fill.beginFill(0xff2200);
+  bossGfx._fill.drawRoundedRect(-90, 80, 180 * frac, 12, 6);
+  bossGfx._fill.endFill();
+}
+
+// ─── Banner helper ────────────────────────────────────────────────────────────
+let bannerTimer = null;
+function showBanner(msg, color = '#ffffff') {
+  const el = document.getElementById('banner');
+  el.textContent = msg;
+  el.style.color  = color;
+  el.style.opacity = '1';
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { el.style.opacity = '0'; }, 2400);
+}
+
+// ─── Wave management ─────────────────────────────────────────────────────────
+function advanceWave() {
+  waveNum++;
+  if (waveNum > TOTAL_WAVES) {
+    triggerVictory();
+    return;
+  }
+  document.getElementById('wave-value').textContent = `${waveNum} / ${TOTAL_WAVES}`;
+  showBanner(`⚔️ Wave ${waveNum}!`, '#aaeeff');
+  spawnWave(waveNum);
+}
+
+function triggerVictory() {
+  if (sessionDone) return;
+  sessionDone = true;
+  gameOver = true;
+  sdk.markComplete();
+  showBanner('🏆 REALM CLEARED!', '#ffcc44');
+  setTimeout(() => {
+    document.getElementById('rating-screen').style.display = 'flex';
+  }, 2000);
+}
+
+// ─── Combat Tick ─────────────────────────────────────────────────────────────
+function combatTick(dt) {
+  if (gameOver) return;
+
+  const isResting = currentWatts < 30;
+
+  // Hero attacks
+  heroes.forEach(h => {
+    if (!h.alive) return;
+    h.cdTimer -= dt;
+
+    // Scale cooldown by SPM: SPM 20 = baseline speed
+    const spmFactor  = Math.max(0.5, 20 / Math.max(currentSpm, 8));
+    const effectiveCD = h.baseCD * spmFactor;
+
+    if (h.cdTimer <= 0 && !isResting) {
+      h.cdTimer = effectiveCD;
+
+      // Pick alive target
+      let target = null;
+      if (bossMode) {
+        target = { x: ENEMY_X_BASE, y: MID_Y, isBoss: true };
+      } else {
+        const alive = enemies.filter(e => e.alive);
+        if (alive.length === 0) return;
+        target = alive[Math.floor(Math.random() * alive.length)];
+      }
+
+      // Damage scales with watts: 100W = baseline (×1.0)
+      const dmg = h.baseDmg * (Math.max(currentWatts, 20) / 100);
+      spawnProjectile(h.gfx.x, h.gfx.y, target.x || target.gfx.x, target.y || target.gfx.y, h.accentColor);
+
+      // Apply damage after projectile travel time
+      const travelMs = 400;
+      setTimeout(() => {
+        if (target.isBoss) {
+          bossHp -= dmg;
+          spawnDamageNumber(bossGfx.x, bossGfx.y - 80, dmg, 0xffcc44);
+          if (bossHp <= 0) {
+            spawnExplosion(bossGfx.x, bossGfx.y, 0xffaa00);
+            spawnExplosion(bossGfx.x, bossGfx.y, 0xff2200);
+            mainLayer.removeChild(bossGfx);
+            bossGfx = null;
+            triggerVictory();
+          }
+        } else if (target.alive) {
+          target.hp -= dmg;
+          spawnDamageNumber(target.gfx.x, target.gfx.y - target.size - 10, dmg, 0xffff88);
+          updateEnemyHpBar(target);
+          if (target.hp <= 0) {
+            target.alive = false;
+            spawnExplosion(target.gfx.x, target.gfx.y, WAVE_ENEMY_COLORS[waveNum - 1]);
+            mainLayer.removeChild(target.gfx);
+          }
+        }
+      }, travelMs);
+    }
+  });
+
+  // Check wave clear (non-boss)
+  if (!bossMode && !gameOver) {
+    const anyAlive = enemies.some(e => e.alive);
+    if (!anyAlive && enemies.length > 0) {
+      enemies = []; // prevent re-trigger
+      setTimeout(advanceWave, 900);
+    }
+  }
+}
+
+// ─── Hero bob animation ───────────────────────────────────────────────────────
+let heroTick = 0;
+function animateHeroes(dt) {
+  heroTick += dt;
+  const isResting = currentWatts < 30;
+  heroes.forEach((h, i) => {
+    const bobAmp  = isResting ? 1.5 : 3 + (currentWatts / 200) * 6;
+    const bobFreq = isResting ? 0.8 : 1.5 + (currentSpm / 40);
+    h.gfx.y = h.yPos + Math.sin(heroTick * bobFreq + i * 1.2) * bobAmp;
+  });
+}
+
+// ─── Boss rotation ────────────────────────────────────────────────────────────
+let bossRot = 0;
+function animateBoss(dt) {
+  if (!bossGfx) return;
+  bossRot += dt * (0.3 + (bossPhase * 0.25));
+  bossGfx.rotation = bossRot;
+
+  // Bob
+  bossGfx.y = MID_Y + Math.sin(bossRot * 1.4) * 12;
+
+  updateBossHpBar();
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+app.ticker.add((delta) => {
+  const dt = delta / 60; // seconds per frame
+  updateBackground(dt);
+  animateHeroes(dt);
+  if (bossMode) animateBoss(dt);
+  combatTick(dt);
+  updateParticles(dt);
+  updateHeroHpBars();
+});
+
+// ─── SDK Integration ─────────────────────────────────────────────────────────
+const sdk = new ExperimentSDK({
+  onStroke(data) {
+    currentWatts = data.watts;
+    currentSpm   = data.spm;
+    document.getElementById('watts-val').textContent = Math.round(data.watts);
+    document.getElementById('spm-val').textContent   = Math.round(data.spm);
+  },
+  onInterval(data) {
+    currentWatts = data.watts;
+    currentSpm   = data.spm;
+    document.getElementById('watts-val').textContent = Math.round(data.watts);
+    document.getElementById('spm-val').textContent   = Math.round(data.spm);
+  },
+  onSessionEnd() {
+    if (!sessionDone) sdk.quit();
+  },
+});
+
+sdk.addEventListener('connectionStatus', (e) => {
+  const el = document.getElementById('connection');
+  el.textContent = e.detail.connected ? '🟢 Connected' : '🔴 Disconnected';
+});
+
+// ─── Rating screen ────────────────────────────────────────────────────────────
+document.querySelectorAll('.star-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const r = parseInt(btn.dataset.r, 10);
+    document.querySelectorAll('.star-btn').forEach((b, i) => {
+      b.style.color = i < r ? '#ffcc44' : '#555';
+    });
+    await sdk.submitRating(r);
+    setTimeout(() => { document.getElementById('rating-screen').style.display = 'none'; }, 600);
+  });
+});
+
+// Boot: start wave 1
+spawnWave(1);
+showBanner('⚔️ Wave 1 — Draw your swords!', '#aaeeff');
+</script>
+</body>
+</html>
