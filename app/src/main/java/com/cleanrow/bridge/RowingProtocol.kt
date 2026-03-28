@@ -36,7 +36,6 @@ object RowingProtocol {
     data class RowingState(
             val errorFlags: Int = 0,
             val drag: Int = 0,
-            val rpm: Int = 0,
             val watts: Int = 0,
             val spm: Int = 0, // Strokes per minute
             val strokeCount: Int = 0,
@@ -167,7 +166,6 @@ object RowingProtocol {
             RowingState(
                     errorFlags = buffer[offset + 10].toInt() and 0xFF,
                     drag = buffer.readUInt16(offset + 11),
-                    rpm = buffer.readUInt16(offset + 13),
                     watts = buffer.readUInt16(offset + 15),
                     spm = buffer.readUInt16(offset + 17),
                     strokeCount = buffer.readUInt16(offset + 19),

@@ -143,7 +143,6 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
     fun sendRowingData(state: RowingProtocol.RowingState) {
         val json =
                 JSONObject().apply {
-                    put("rpm", state.rpm)
                     put("watts", state.watts)
                     put("spm", state.spm)
                     put("strokeCount", state.strokeCount)

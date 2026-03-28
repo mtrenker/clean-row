@@ -36,7 +36,6 @@ window.addEventListener('rowingData', (event) => {
     console.log('Rowing data:', data);
 
     // Update UI elements
-    document.getElementById('rpm').textContent = data.rpm;
     document.getElementById('watts').textContent = data.watts;
     document.getElementById('spm').textContent = data.spm;
     document.getElementById('strokes').textContent = data.strokeCount;
