@@ -59,7 +59,9 @@ echo "📱 Connected device:"
 echo ""
 
 echo "🔌 Setting up ADB reverse tcp:$WEB_PORT -> tcp:$WEB_PORT ..."
+ADB_REV_OK=false
 if "$ADB_BIN" -s "$CONNECTED_SERIAL" reverse "tcp:$WEB_PORT" "tcp:$WEB_PORT" >/dev/null 2>&1; then
+    ADB_REV_OK=true
     echo "ADB reverse active. Use http://127.0.0.1:$WEB_PORT in the app for local dev."
 else
     echo "⚠️  Failed to set ADB reverse. Direct LAN URL may still work if reachable."
@@ -82,6 +84,24 @@ fi
 echo ""
 echo "📦 Installing..."
 "$ADB_BIN" -s "$CONNECTED_SERIAL" install -r "$APK_PATH"
+
+# Configure WebView URL in SharedPreferences
+echo ""
+echo "🔗 Configuring WebView URL..."
+# Prefer a stable LAN IP over the ADB reverse tunnel (127.0.0.1),
+# because the ADB wireless reverse is not persistent after disconnect.
+# Override at deploy time with: PLATFORM_URL=http://myhost:3000/dashboard/index.html ./deploy.sh
+if [ -z "${PLATFORM_URL:-}" ]; then
+    LAN_IP=$(hostname -I | awk '{print $1}')
+    PLATFORM_URL="http://${LAN_IP}:${WEB_PORT}/dashboard/index.html"
+fi
+PREFS_XML="<?xml version='1.0' encoding='utf-8' standalone='yes' ?><map><string name=\"web_url\">${PLATFORM_URL}</string></map>"
+if echo "$PREFS_XML" | "$ADB_BIN" -s "$CONNECTED_SERIAL" shell run-as com.cleanrow.bridge tee /data/data/com.cleanrow.bridge/shared_prefs/CleanRowPrefs.xml >/dev/null 2>&1; then
+    echo "✅ WebView URL set to: $PLATFORM_URL"
+else
+    echo "⚠️  Could not write SharedPreferences (non-debug build or app not yet launched once?)"
+    echo "   Expected URL: $PLATFORM_URL"
+fi
 
 echo ""
 echo "✅ Deployment complete!"

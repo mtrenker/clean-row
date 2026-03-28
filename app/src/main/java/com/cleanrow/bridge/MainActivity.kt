@@ -40,6 +40,7 @@ class MainActivity :
     private var rowingService: RowingService? = null
     private var serviceBound = false
     private var isDisplayDimmed = false
+    private var lastConnectionStatus: Pair<Boolean, String>? = null
 
     private val serviceConnection =
             object : ServiceConnection {
@@ -139,6 +140,10 @@ class MainActivity :
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
                         Log.d(TAG, "Page loaded: $url")
+                        // Re-send connection status so experiment pages don't stay at "Connecting..."
+                        lastConnectionStatus?.let { (connected, message) ->
+                            bridge.sendConnectionStatus(connected, message)
+                        }
                     }
 
                     override fun onReceivedError(
@@ -201,6 +206,7 @@ class MainActivity :
 
     override fun onConnectionStatusChanged(connected: Boolean, message: String) {
         Log.d(TAG, "Connection status: $connected - $message")
+        lastConnectionStatus = connected to message
         bridge.sendConnectionStatus(connected, message)
     }
 

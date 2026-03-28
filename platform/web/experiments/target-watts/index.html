@@ -1,0 +1,351 @@
+<!-- manifest: {"type":"game","difficulty":"medium","tags":["power","target","interval"]} -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watt Hunter</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a1a;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #status-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: rgba(0,0,0,0.5);
+    font-size: 0.85em;
+    z-index: 100;
+  }
+
+  #arena {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  #target-zone {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    border-radius: 8px;
+    background: rgba(0, 255, 100, 0.15);
+    border: 2px solid #00ff64;
+    transition: top 0.3s ease, height 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75em;
+    color: #00ff64;
+  }
+
+  #power-bar-container {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    bottom: 60px;
+    top: 60px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  #power-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0; right: 0;
+    background: linear-gradient(to top, #ff6b35, #f7cb15, #00ff64);
+    border-radius: 8px;
+    transition: height 0.1s ease;
+  }
+
+  #power-label {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 20px;
+    font-size: 2em;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 20px currentColor;
+  }
+
+  #score-display {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #f7cb15;
+    text-shadow: 0 0 15px #f7cb15;
+  }
+
+  #hit-flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+
+  .phase-label {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3em;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    text-shadow: 0 0 30px currentColor;
+  }
+
+  #end-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+  }
+  #end-screen h2 { font-size: 2.5em; color: #f7cb15; }
+  #end-screen p { font-size: 1.2em; opacity: 0.8; }
+
+  .rating-buttons { display: flex; gap: 12px; margin-top: 10px; }
+  .rating-btn {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: transparent;
+    color: #fff;
+    font-size: 1.4em;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .rating-btn:hover, .rating-btn.selected { background: #f7cb15; border-color: #f7cb15; color: #000; }
+</style>
+</head>
+<body>
+<script src="/shared/nav.js"></script>
+
+<div id="status-bar">
+  <span id="connection">⚪ Connecting...</span>
+  <span id="elapsed">0:00</span>
+  <span id="spm-display">0 SPM</span>
+</div>
+
+<div id="score-display">Score: 0</div>
+
+<div id="arena">
+  <div id="power-bar-container">
+    <div id="power-bar" style="height: 0%"></div>
+  </div>
+  <div id="target-zone">TARGET</div>
+  <div id="power-label">0W</div>
+</div>
+
+<div id="hit-flash"></div>
+<div class="phase-label" id="phase-label"></div>
+
+<div id="end-screen">
+  <h2>🏁 Session Complete!</h2>
+  <p id="end-stats"></p>
+  <p>How fun was that?</p>
+  <div class="rating-buttons">
+    <button class="rating-btn" data-rating="1">1</button>
+    <button class="rating-btn" data-rating="2">2</button>
+    <button class="rating-btn" data-rating="3">3</button>
+    <button class="rating-btn" data-rating="4">4</button>
+    <button class="rating-btn" data-rating="5">5</button>
+  </div>
+</div>
+
+<script src="/sdk/experiment-sdk.js"></script>
+<script>
+  // ── Game state ────────────────────────────────────────────────────────────
+  const MAX_WATTS = 300;
+  const TOTAL_ROUNDS = 8;
+  const ROUND_DURATION_S = 45;   // each round = 45s
+  const REST_DURATION_S = 15;
+
+  let score = 0;
+  let currentRound = 0;
+  let inRest = false;
+  let roundTimer = 0;
+  let targetWatts = 150;
+  let targetTolerance = 25;  // ±25W counts as a hit
+  let hitStreak = 0;
+  let roundStartTime = 0;
+
+  const rounds = generateRounds();
+
+  function generateRounds() {
+    // Progressive difficulty: start easy, ramp up
+    return [
+      { target: 100, tolerance: 30 },
+      { target: 130, tolerance: 25 },
+      { target: 150, tolerance: 25 },
+      { target: 170, tolerance: 20 },
+      { target: 150, tolerance: 20 },
+      { target: 180, tolerance: 20 },
+      { target: 200, tolerance: 15 },
+      { target: 160, tolerance: 25 },   // cooldown
+    ];
+  }
+
+  function startRound(idx) {
+    if (idx >= TOTAL_ROUNDS) {
+      sdk.markComplete();
+      return;
+    }
+    inRest = false;
+    currentRound = idx;
+    const r = rounds[idx];
+    targetWatts = r.target;
+    targetTolerance = r.tolerance;
+    roundTimer = ROUND_DURATION_S;
+    roundStartTime = Date.now();
+    updateTargetZone();
+    showPhaseLabel(`Round ${idx + 1}`, '#f7cb15');
+  }
+
+  function startRest() {
+    inRest = true;
+    roundTimer = REST_DURATION_S;
+    showPhaseLabel('Rest', '#4fc3f7');
+    document.getElementById('target-zone').style.display = 'none';
+  }
+
+  function updateTargetZone() {
+    const zone = document.getElementById('target-zone');
+    const container = document.getElementById('power-bar-container');
+    const containerH = container.clientHeight;
+
+    const centerPct = targetWatts / MAX_WATTS;
+    const tolerancePct = targetTolerance / MAX_WATTS;
+
+    const topPct = 1 - (centerPct + tolerancePct);
+    const heightPct = tolerancePct * 2;
+
+    zone.style.display = 'flex';
+    zone.style.bottom = `${(centerPct - tolerancePct) * 100}%`;
+    zone.style.height = `${heightPct * 100}%`;
+    zone.textContent = `${targetWatts}W ±${targetTolerance}`;
+
+    // Position relative to the bar
+    const barContainer = document.getElementById('power-bar-container');
+    const bcRect = barContainer.getBoundingClientRect();
+    zone.style.left = `calc(50% + 50px)`;
+    zone.style.bottom = `${60 + (centerPct - tolerancePct) * (window.innerHeight - 120)}px`;
+    zone.style.height = `${heightPct * (window.innerHeight - 120)}px`;
+  }
+
+  function showPhaseLabel(text, color) {
+    const el = document.getElementById('phase-label');
+    el.textContent = text;
+    el.style.color = color;
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 1500);
+  }
+
+  function flashHit(hit) {
+    const el = document.getElementById('hit-flash');
+    el.style.background = hit ? 'rgba(0,255,100,0.15)' : 'rgba(255,50,50,0.1)';
+    el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 120);
+  }
+
+  function formatTime(s) {
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+
+  // ── SDK setup ──────────────────────────────────────────────────────────────
+  let sdk;
+
+  sdk = new ExperimentSDK({
+    onStroke: (data) => {
+      if (inRest) return;
+
+      const pct = Math.min(1, data.watts / MAX_WATTS);
+      document.getElementById('power-bar').style.height = `${pct * 100}%`;
+      document.getElementById('power-label').textContent = `${data.watts}W`;
+      document.getElementById('spm-display').textContent = `${data.spm} SPM`;
+
+      const inZone = Math.abs(data.watts - targetWatts) <= targetTolerance;
+      if (inZone) {
+        hitStreak++;
+        score += 10 + Math.floor(hitStreak * 2);
+        flashHit(true);
+      } else {
+        hitStreak = 0;
+        flashHit(false);
+      }
+
+      document.getElementById('score-display').textContent = `Score: ${score}`;
+    },
+
+    onInterval: (data, elapsedS) => {
+      document.getElementById('elapsed').textContent = formatTime(elapsedS);
+
+      if (roundTimer > 0) {
+        roundTimer--;
+      } else {
+        if (inRest) {
+          startRound(currentRound + 1);
+        } else {
+          startRest();
+        }
+      }
+    },
+
+    onSessionEnd: (summary) => {
+      document.getElementById('arena').style.display = 'none';
+      document.getElementById('score-display').style.display = 'none';
+      const endScreen = document.getElementById('end-screen');
+      endScreen.style.display = 'flex';
+      document.getElementById('end-stats').textContent =
+        `${summary.totalStrokes} strokes · ${formatTime(summary.durationS)} · Score: ${score}`;
+    },
+  });
+
+  // Start first round after SDK initializes (give it 500ms)
+  setTimeout(() => startRound(0), 500);
+
+  // Connection status
+  window.addEventListener('connectionStatus', (e) => {
+    const el = document.getElementById('connection');
+    el.textContent = e.detail.connected ? '🟢 Connected' : '🔴 Disconnected';
+  });
+
+  // Rating buttons
+  let ratingSubmitted = false;
+  document.querySelectorAll('.rating-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (ratingSubmitted) return;
+      ratingSubmitted = true;
+      document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      await sdk.submitRating(parseInt(btn.dataset.rating));
+    });
+  });
+
+  // Resize handler for target zone
+  window.addEventListener('resize', () => { if (!inRest) updateTargetZone(); });
+</script>
+</body>
+</html>

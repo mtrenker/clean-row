@@ -24,6 +24,9 @@ gradle-app.setting
 # Local configuration file (sdk path, etc)
 local.properties
 
+# Platform environment secrets
+platform/.env
+
 # Android Studio files
 .idea/
 *.iml

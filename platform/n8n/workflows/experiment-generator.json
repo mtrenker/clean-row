@@ -1,0 +1,99 @@
+{
+    "name": "CleanRow - AI Experiment Generator",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "hoursInterval": 12
+                        }
+                    ]
+                }
+            },
+            "name": "Schedule Trigger",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://cleanrow-backend:8000/api/ai/generate-experiment",
+                "options": {
+                    "timeout": 180000
+                },
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "qwen2.5-coder:32b"
+                        }
+                    ]
+                }
+            },
+            "name": "Trigger AI Generation",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "number": [
+                        {
+                            "value1": "={{ $json.id !== undefined }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "name": "Success?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                680,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Schedule Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Trigger AI Generation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Trigger AI Generation": {
+            "main": [
+                [
+                    {
+                        "node": "Success?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": [
+        "cleanrow"
+    ],
+    "_note": "Import into n8n. Set the backend URL to your Docker network or host IP. Activate once ready."
+}

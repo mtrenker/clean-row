@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="app_name">Clean Row</string>
-  <string name="default_url">http://127.0.0.1:3000</string>
+  <string name="default_url">http://192.168.178.20:3000/dashboard/index.html</string>
   <string name="loading">Loading workout interface...</string>
   <string name="error_loading">Failed to load web interface</string>
 </resources>

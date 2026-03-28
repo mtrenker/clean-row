@@ -1,0 +1,111 @@
+{
+    "name": "CleanRow - Garmin Daily Sync",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 6 * * *"
+                        }
+                    ]
+                }
+            },
+            "name": "Daily at 6am",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailySummaryChart/YOUR_GARMIN_USERNAME",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "options": {},
+                "_note": "You need Garmin Connect OAuth or cookie-based auth. See garminconnect Python library or use a Garmin Connect IQ compatible approach. Alternatively use the garmin-connect npm package in a Function node."
+            },
+            "name": "Fetch Garmin Data",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                460,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Parse Garmin response and extract relevant fields\n// Adjust field names based on actual Garmin Connect API response\nconst data = $input.first().json;\n\n// This is a template - actual field paths depend on Garmin endpoint used\nreturn [{\n  json: {\n    calendar_date: new Date().toISOString().split('T')[0],\n    sleep_score: data.dailySleepDTO?.sleepScores?.overall?.value ?? null,\n    body_battery_max: data.bodyBatteryFeedbackList?.[0]?.bodyBatteryLevel ?? null,\n    resting_hr: data.restingHeartRate ?? null,\n    hrv_status: data.hrvSummary?.weeklyAvg ? 'balanced' : null,\n    hrv_weekly_avg: data.hrvSummary?.weeklyAvg ?? null,\n    stress_avg: data.averageStressLevel ?? null,\n    raw: data\n  }\n}];"
+            },
+            "name": "Transform Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                680,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://cleanrow-backend:8000/api/garmin/daily",
+                "method": "POST",
+                "sendBody": true,
+                "contentType": "json",
+                "body": "={{ JSON.stringify($json) }}"
+            },
+            "name": "Store in Backend",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                900,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Daily at 6am": {
+            "main": [
+                [
+                    {
+                        "node": "Fetch Garmin Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Fetch Garmin Data": {
+            "main": [
+                [
+                    {
+                        "node": "Transform Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Transform Data": {
+            "main": [
+                [
+                    {
+                        "node": "Store in Backend",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": [
+        "cleanrow"
+    ],
+    "_note": "Garmin Connect does not have an official public API. Options: (1) garmin-connect npm package in a Code node with your credentials, (2) garminconnect Python service as a sidecar, (3) Garmin Health API (enterprise). The Transform Data node field paths must be adjusted to the actual response format you get."
+}

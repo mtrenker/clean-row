@@ -1,0 +1,70 @@
+{
+    "name": "CleanRow - Daily Session Recommendation",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "cronExpression",
+                            "expression": "0 7 * * *"
+                        }
+                    ]
+                }
+            },
+            "name": "Daily at 7am",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1,
+            "position": [
+                240,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://cleanrow-backend:8000/api/ai/recommend-session",
+                "method": "POST",
+                "options": {
+                    "timeout": 60000
+                },
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "model",
+                            "value": "llama3.2:latest"
+                        }
+                    ]
+                }
+            },
+            "name": "Generate Recommendation",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4,
+            "position": [
+                460,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Daily at 7am": {
+            "main": [
+                [
+                    {
+                        "node": "Generate Recommendation",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "active": false,
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": [
+        "cleanrow"
+    ],
+    "_note": "Runs every morning at 7am. Fetches last 7 sessions + latest Garmin data and generates a recommendation shown on the dashboard."
+}
