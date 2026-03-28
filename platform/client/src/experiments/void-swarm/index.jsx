@@ -22,6 +22,7 @@ const ENEMY_SPEED_RAMP = 0.00015; // per elapsed second
 const SPAWN_BASE_MS    = 1400;
 const SPAWN_MIN_MS     = 260;
 const SPAWN_RAMP       = 1.7;   // ms reduction per second
+const HERO_BOUNDARY    = 0.22;  // fraction of screen kept as spawn-free safe zone
 
 export default function VoidSwarm() {
   return (
@@ -184,8 +185,12 @@ function Scene() {
     const len = Math.hypot(dx, dy) || 1;
     hero.vx = (dx / len) * speed;
     hero.vy = (dy / len) * speed;
-    hero.x  = Math.max(HERO_RADIUS, Math.min(screen.width  - HERO_RADIUS, hero.x + hero.vx * dt));
-    hero.y  = Math.max(HERO_RADIUS, Math.min(screen.height - HERO_RADIUS, hero.y + hero.vy * dt));
+    const bndL = screen.width  * HERO_BOUNDARY;
+    const bndR = screen.width  * (1 - HERO_BOUNDARY);
+    const bndT = screen.height * HERO_BOUNDARY;
+    const bndB = screen.height * (1 - HERO_BOUNDARY);
+    hero.x  = Math.max(bndL + HERO_RADIUS, Math.min(bndR - HERO_RADIUS, hero.x + hero.vx * dt));
+    hero.y  = Math.max(bndT + HERO_RADIUS, Math.min(bndB - HERO_RADIUS, hero.y + hero.vy * dt));
     hero.angle += 2 * dt;
 
     // Aim toward nearest enemy
@@ -206,7 +211,8 @@ function Scene() {
       // Spread shot: 1 main + extras at higher watts
       const shots = 1 + Math.floor(w / 80);
       for (let i = 0; i < shots; i++) {
-        const spread = (i - (shots - 1) / 2) * 0.28;
+        // Shot 0 always goes straight at the enemy; extras fan out alternating right/left
+        const spread = i === 0 ? 0 : (Math.ceil(i / 2) * 0.28) * (i % 2 === 1 ? 1 : -1);
         const bx = Math.cos(Math.atan2(aimY, aimX) + spread);
         const by = Math.sin(Math.atan2(aimY, aimX) + spread);
         s.bullets.push({
@@ -301,6 +307,11 @@ function Scene() {
 
     // ── Render all via single Graphics object ─────────────────────────────────
     gfx.clear();
+
+    // Safe-zone boundary
+    gfx.rect(bndL, bndT, bndR - bndL, bndB - bndT);
+    gfx.setStrokeStyle({ width: 1, color: 0x3a2555, alpha: 0.55 });
+    gfx.stroke();
 
     // Subtle grid
     gfx.setStrokeStyle({ width: 1, color: 0x1a1025, alpha: 0.8 });
