@@ -9,7 +9,8 @@ import styles from './ExperimentPage.module.css';
  */
 const EXPERIMENTS = {
   'target-watts': lazy(() => import('../experiments/target-watts/index.jsx')),
-  'void-swarm':   lazy(() => import('../experiments/void-swarm/index.jsx')),
+  'void-swarm': lazy(() => import('../experiments/void-swarm/index.jsx')),
+  'aurora': lazy(() => import('../experiments/aurora/index.jsx')),
 };
 
 export default function ExperimentPage() {

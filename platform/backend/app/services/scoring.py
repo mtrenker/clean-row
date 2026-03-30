@@ -42,9 +42,9 @@ async def recalculate_experiment_score(experiment_id: uuid.UUID, db: AsyncSessio
             ref_watts = BASELINE_WATTS
         else:
             prev = sessions[:i]
-            ref_watts = sum(p.avg_watts or 0 for p in prev) / len(prev)
+            ref_watts = sum(float(p.avg_watts or 0) for p in prev) / len(prev)
 
-        watts = s.avg_watts or 0
+        watts = float(s.avg_watts or 0)
         watts_delta_score = min(1.0, max(0.0, (watts - ref_watts + 50) / 100))
 
         # Completion score
@@ -55,8 +55,8 @@ async def recalculate_experiment_score(experiment_id: uuid.UUID, db: AsyncSessio
             ref_duration = BASELINE_DURATION_S
         else:
             prev = sessions[:i]
-            ref_duration = sum(p.duration_s or 0 for p in prev) / len(prev)
-        duration = s.duration_s or 0
+            ref_duration = sum(float(p.duration_s or 0) for p in prev) / len(prev)
+        duration = float(s.duration_s or 0)
         duration_delta_score = min(1.0, max(0.0, (duration - ref_duration + 300) / 600))
 
         # Fun rating (1-5 → 0-1)

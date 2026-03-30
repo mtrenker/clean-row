@@ -24,6 +24,11 @@
   letter-spacing: 0.08em;
   color: #fff;
   text-shadow: 0 0 30px rgba(0, 255, 100, 0.3);
+  cursor: pointer;
+  user-select: none;
+}
+.logo:active {
+  opacity: 0.7;
 }
 
 .sub {

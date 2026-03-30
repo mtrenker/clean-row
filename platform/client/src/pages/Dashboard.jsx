@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import styles from './Dashboard.module.css';
 
@@ -13,7 +13,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     fetch('/api/experiments?status=active')
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -24,13 +26,15 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { load(); }, [load]);
+
   if (loading) return <div className={styles.center}>Loading experiments…</div>;
   if (error) return <div className={styles.center}>⚠ {error}</div>;
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.logo}>Clean Row</h1>
+        <h1 className={styles.logo} onClick={load} title="Reload">Clean Row</h1>
         <p className={styles.sub}>Choose your experiment</p>
       </header>
 
