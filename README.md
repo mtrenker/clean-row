@@ -1,22 +1,19 @@
 # Clean Row 🚣
 
-A Kotlin Android app that bridges your rowing machine's serial interface with
-web-based interfaces. Build custom workout UIs, mini-games, and interactive
-experiences using HTML, CSS, and JavaScript.
+A Kotlin Android app that bridges your Sportstech S-Row rowing machine's serial interface with web-based interfaces. Build custom workout UIs, mini-games, and interactive experiences using HTML, CSS, and JavaScript.
 
 ## Features
 
 - ✅ **Real-time data streaming** - RPM, watts, SPM, stroke count at 10Hz
 - ✅ **Control commands** - Set drag level, target watts, LED colors
-- ✅ **Physical button support** - Short/long press events from the machine's
-  button
+- ✅ **Physical button support** - Short/long press events from the machine's button
 - ✅ **Remote web interface** - Load any HTTP(S) URL during development
 - ✅ **Window-based communication** - Simple `postMessage` API for JS ↔ Kotlin
 - ✅ **No root required** - Serial port has world read/write permissions
 
 ## Prerequisites
 
-- Rowing machine with Android 13 (SP2101V board)
+- Sportstech S-Row with Android 13 (SP2101V board)
 - WiFi debugging enabled (see installation below)
 - Development machine on same network as rowing machine
 - Web server for hosting your UI (or use the example)
@@ -25,8 +22,7 @@ experiences using HTML, CSS, and JavaScript.
 
 ### 1. Download `android-serialport-api.jar`
 
-You need the serial port library. Download from
-[cepr/android-serialport-api](https://github.com/cepr/android-serialport-api):
+You need the serial port library. Download from [cepr/android-serialport-api](https://github.com/cepr/android-serialport-api):
 
 ```bash
 cd clean-row/app/libs
@@ -45,7 +41,7 @@ cd clean-row
 
 The APK will be at `app/build/outputs/apk/debug/app-debug.apk`.
 
-### 3. Enable Wireless Debugging on Rowing Machine
+### 3. Enable Wireless Debugging on S-Row
 
 On the rowing machine's touchscreen:
 
@@ -97,31 +93,31 @@ The app dispatches custom events on `window` at 10Hz:
 
 ```javascript
 // Listen for rowing data
-window.addEventListener("rowingData", (event) => {
+window.addEventListener('rowingData', (event) => {
     const data = event.detail;
-    console.log("RPM:", data.rpm);
-    console.log("Watts:", data.watts);
-    console.log("SPM:", data.spm);
-    console.log("Strokes:", data.strokeCount);
-    console.log("Drag:", data.drag);
+    console.log('RPM:', data.rpm);
+    console.log('Watts:', data.watts);
+    console.log('SPM:', data.spm);
+    console.log('Strokes:', data.strokeCount);
+    console.log('Drag:', data.drag);
 });
 
 // Listen for connection status
-window.addEventListener("connectionStatus", (event) => {
+window.addEventListener('connectionStatus', (event) => {
     const status = event.detail;
     if (status.connected) {
-        console.log("Connected to rowing machine");
+        console.log('Connected to rowing machine');
     } else {
-        console.log("Disconnected:", status.message);
+        console.log('Disconnected:', status.message);
     }
 });
 
 // Listen for physical button presses
-window.addEventListener("buttonPress", (event) => {
+window.addEventListener('buttonPress', (event) => {
     const button = event.detail;
-    if (button.type === "shortPress") {
+    if (button.type === 'shortPress') {
         // Handle short press
-    } else if (button.type === "longPress") {
+    } else if (button.type === 'longPress') {
         // Handle long press (screen will auto-dim)
     }
 });
@@ -134,68 +130,50 @@ Use `window.cleanRowBridge.postMessage()` to send commands:
 ```javascript
 // Set drag level (0-24)
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "setDrag",
-    value: 12,
+    type: 'command',
+    action: 'setDrag',
+    value: 12
 });
 
 // Set target watts (0-500)
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "setWatt",
-    value: 150,
+    type: 'command',
+    action: 'setWatt',
+    value: 150
 });
 
 // Set LED RGB color
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "setLedRgb",
+    type: 'command',
+    action: 'setLedRgb',
     r: 255,
     g: 0,
-    b: 128,
+    b: 128
 });
 
 // Set LED preset (0-7)
 // 0=off, 1=blue, 2=cyan, 3=green, 4=yellow, 5=orange, 6=red, 7=purple
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "setLedPreset",
-    value: 3,
+    type: 'command',
+    action: 'setLedPreset',
+    value: 3
 });
 
 // Clear stroke counter
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "clearCounter",
+    type: 'command',
+    action: 'clearCounter'
 });
 
 // Pause/resume data polling
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "pause",
+    type: 'command',
+    action: 'pause'
 });
 
 window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "resume",
-});
-
-// Reload current page inside the app
-window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "reload",
-});
-
-// Close app activity
-window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "closeApp",
-});
-
-// Restart app process
-window.cleanRowBridge.postMessage({
-    type: "command",
-    action: "restartApp",
+    type: 'command',
+    action: 'resume'
 });
 ```
 
@@ -205,7 +183,7 @@ Use the included `bridge.js` for a cleaner API:
 
 ```javascript
 // Import bridge.js in your HTML
-<script src="bridge.js"></script>;
+<script src="bridge.js"></script>
 
 // Use the helper functions
 CleanRowAPI.setDrag(15);
@@ -215,9 +193,6 @@ CleanRowAPI.setLedPreset(6);
 CleanRowAPI.clearCounter();
 CleanRowAPI.pause();
 CleanRowAPI.resume();
-CleanRowAPI.reload();
-CleanRowAPI.closeApp();
-CleanRowAPI.restartApp();
 ```
 
 ## Data Format
@@ -270,11 +245,9 @@ Then update the app's URL to `http://YOUR_IP:3000` and reload.
 
 1. **Start your web server** (e.g., React dev server, Vite, etc.)
 2. **Update the URL** in the app or strings.xml
-3. **Rebuild and install** the APK:
-   `./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk`
+3. **Rebuild and install** the APK: `./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk`
 4. **Launch the app** on the rowing machine
-5. **Iterate on your web UI** - changes reflect on refresh (pull-down gesture in
-   WebView)
+5. **Iterate on your web UI** - changes reflect on refresh (pull-down gesture in WebView)
 
 ### Hot Reload
 
@@ -286,12 +259,9 @@ To avoid rebuilding the APK every time:
 
 ## Serial Protocol Details
 
-The app communicates with `/dev/ttyS2` at 19200 baud (8N1). The protocol is
-fully documented in the Obsidian vault note: **"Escaping the Rowing Machine
-Kiosk App via ADB"**.
+The app communicates with `/dev/ttyS2` at 19200 baud (8N1). The protocol is fully documented in the Obsidian vault note: **"Escaping the Sportstech S-Row Kiosk App via ADB"**.
 
 Key packet format:
-
 ```
 [0]     0x49 'I'    — header byte 1
 [1]     0x54 'T'    — header byte 2
@@ -365,7 +335,7 @@ Key packet format:
                │
                ▼
 ┌──────────────────────────────────────────┐
-│    Rowing Machine Hardware              │
+│    Sportstech S-Row Hardware            │
 │  - Brake controller                      │
 │  - Sensors (RPM, power)                  │
 │  - LED strip                             │
@@ -404,7 +374,7 @@ MIT - Use freely for your own rowing adventures!
 
 ## Credits
 
-- Serial protocol reverse-engineered from vendor APK
+- Serial protocol reverse-engineered from Sportstech APK
 - Built with AndroidX, Kotlin, and coroutines
 - WebView bridge pattern inspired by React Native
 

@@ -9,17 +9,23 @@ import androidx.webkit.WebViewFeature
 import org.json.JSONObject
 
 /**
- * Bridge between WebView and native Kotlin code. Handles bidirectional communication:
+ * Bridge between WebView and native Kotlin code.
+ * Handles bidirectional communication:
  * - JS → Kotlin: window.postMessage()
  * - Kotlin → JS: Custom events dispatched on window
  */
-class RowingBridge(private val webView: WebView, private val commandHandler: CommandHandler) {
+class RowingBridge(
+    private val webView: WebView,
+    private val commandHandler: CommandHandler
+) {
     companion object {
         private const val TAG = "RowingBridge"
         private const val BRIDGE_NAME = "cleanRowBridge"
     }
-
-    /** Interface for handling commands from the web page. */
+    
+    /**
+     * Interface for handling commands from the web page.
+     */
     interface CommandHandler {
         fun onSetDrag(level: Int)
         fun onSetWatt(watts: Int)
@@ -28,13 +34,11 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
         fun onClearCounter()
         fun onPauseWorkout()
         fun onResumeWorkout()
-        fun onReloadPage()
-        fun onRestartApp()
-        fun onCloseApp()
-        fun onToggleDisplay()
     }
-
-    /** Initialize the bridge using modern WebMessageListener API. */
+    
+    /**
+     * Initialize the bridge using modern WebMessageListener API.
+     */
     fun initialize() {
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             Log.d(TAG, "Using WebMessageListener API")
@@ -43,50 +47,52 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
             Log.w(TAG, "WebMessageListener not supported, commands from web will not work")
         }
     }
-
-    /** Set up WebMessageListener for receiving messages from JavaScript. */
+    
+    /**
+     * Set up WebMessageListener for receiving messages from JavaScript.
+     */
     private fun setupWebMessageListener() {
         try {
             WebViewCompat.addWebMessageListener(
-                    webView,
-                    BRIDGE_NAME,
-                    setOf("*"), // Allow all origins for development
-                    object : WebViewCompat.WebMessageListener {
-                        override fun onPostMessage(
-                                view: WebView,
-                                message: WebMessageCompat,
-                                sourceOrigin: Uri,
-                                isMainFrame: Boolean,
-                                replyProxy: androidx.webkit.JavaScriptReplyProxy
-                        ) {
-                            handleMessage(message.data ?: "")
-                        }
+                webView,
+                BRIDGE_NAME,
+                setOf("*"), // Allow all origins for development
+                object : WebViewCompat.WebMessageListener {
+                    override fun onPostMessage(
+                        view: WebView,
+                        message: WebMessageCompat,
+                        sourceOrigin: Uri,
+                        isMainFrame: Boolean,
+                        replyProxy: androidx.webkit.JavaScriptReplyProxy
+                    ) {
+                        handleMessage(message.data ?: "")
                     }
+                }
             )
             Log.d(TAG, "WebMessageListener registered successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to register WebMessageListener", e)
         }
     }
-
+    
     /**
-     * Handle incoming message from JavaScript. Expected format: {"type": "command", "action":
-     * "setDrag", "value": 8}
+     * Handle incoming message from JavaScript.
+     * Expected format: {"type": "command", "action": "setDrag", "value": 8}
      */
     private fun handleMessage(messageData: String) {
         try {
             Log.d(TAG, "Received message: $messageData")
-
+            
             val json = JSONObject(messageData)
             val type = json.optString("type", "")
-
+            
             if (type != "command") {
                 Log.w(TAG, "Unknown message type: $type")
                 return
             }
-
+            
             val action = json.optString("action", "")
-
+            
             when (action) {
                 "setDrag" -> {
                     val level = json.optInt("value", 0)
@@ -115,18 +121,6 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
                 "resume" -> {
                     commandHandler.onResumeWorkout()
                 }
-                "reload" -> {
-                    commandHandler.onReloadPage()
-                }
-                "restartApp" -> {
-                    commandHandler.onRestartApp()
-                }
-                "closeApp" -> {
-                    commandHandler.onCloseApp()
-                }
-                "toggleDisplay" -> {
-                    commandHandler.onToggleDisplay()
-                }
                 else -> {
                     Log.w(TAG, "Unknown action: $action")
                 }
@@ -135,52 +129,55 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
             Log.e(TAG, "Error handling message", e)
         }
     }
-
+    
     /**
-     * Send rowing data to JavaScript. Dispatches a custom event: new CustomEvent('rowingData',
-     * {detail: {...}})
+     * Send rowing data to JavaScript.
+     * Dispatches a custom event: new CustomEvent('rowingData', {detail: {...}})
      */
     fun sendRowingData(state: RowingProtocol.RowingState) {
-        val json =
-                JSONObject().apply {
-                    put("watts", state.watts)
-                    put("spm", state.spm)
-                    put("strokeCount", state.strokeCount)
-                    put("drag", state.drag)
-                    put("errorFlags", state.errorFlags)
-                    put("timestamp", System.currentTimeMillis())
-                }
-
+        val json = JSONObject().apply {
+            put("rpm", state.rpm)
+            put("watts", state.watts)
+            put("spm", state.spm)
+            put("strokeCount", state.strokeCount)
+            put("drag", state.drag)
+            put("errorFlags", state.errorFlags)
+            put("timestamp", System.currentTimeMillis())
+        }
+        
         dispatchEvent("rowingData", json.toString())
     }
-
-    /** Send button event to JavaScript. */
+    
+    /**
+     * Send button event to JavaScript.
+     */
     fun sendButtonEvent(isLongPress: Boolean) {
-        val json =
-                JSONObject().apply {
-                    put("type", if (isLongPress) "longPress" else "shortPress")
-                    put("timestamp", System.currentTimeMillis())
-                }
-
+        val json = JSONObject().apply {
+            put("type", if (isLongPress) "longPress" else "shortPress")
+            put("timestamp", System.currentTimeMillis())
+        }
+        
         dispatchEvent("buttonPress", json.toString())
     }
-
-    /** Send connection status update to JavaScript. */
+    
+    /**
+     * Send connection status update to JavaScript.
+     */
     fun sendConnectionStatus(connected: Boolean, message: String = "") {
-        val json =
-                JSONObject().apply {
-                    put("connected", connected)
-                    put("message", message)
-                    put("timestamp", System.currentTimeMillis())
-                }
-
+        val json = JSONObject().apply {
+            put("connected", connected)
+            put("message", message)
+            put("timestamp", System.currentTimeMillis())
+        }
+        
         dispatchEvent("connectionStatus", json.toString())
     }
-
-    /** Dispatch a custom event on the window object in JavaScript. */
+    
+    /**
+     * Dispatch a custom event on the window object in JavaScript.
+     */
     private fun dispatchEvent(eventName: String, detailJson: String) {
-        val script =
-                """
+        val script = """
             (function() {
                 try {
                     const event = new CustomEvent('$eventName', {
@@ -192,7 +189,9 @@ class RowingBridge(private val webView: WebView, private val commandHandler: Com
                 }
             })();
         """.trimIndent()
-
-        webView.post { webView.evaluateJavascript(script, null) }
+        
+        webView.post {
+            webView.evaluateJavascript(script, null)
+        }
     }
 }

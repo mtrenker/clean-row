@@ -2,22 +2,35 @@
 
 ## ⚠️ Important: Missing Library
 
-Before building, you need to obtain the serial port library. This is the **only
-manual step required**.
+Before building, you need to obtain the serial port library. This is the **only manual step required**.
 
 ### Getting the Serial Port Library
 
+The easiest method (if you have Node.js/npm):
+
 ```bash
-# Option A: Download pre-built JAR
-wget https://github.com/cepr/android-serialport-api/releases/download/v2.0/android-serialport-api-v2.0.jar \
-  -O app/libs/android-serialport-api.jar
+# Option A: Download pre-built JAR from Maven/releases
+# Search for: android-serialport-api on GitHub releases
 
 # Option B: Build from source (requires Android SDK)
 cd /tmp
 git clone https://github.com/cepr/android-serialport-api.git
 cd android-serialport-api
 # Follow build instructions in their README
-# Copy resulting JAR to: app/libs/android-serialport-api.jar
+# Copy resulting JAR to: /home/martin/dev/clean-row/app/libs/android-serialport-api.jar
+```
+
+### Alternative: Extract from Sportstech APK
+
+Since you already have the Sportstech APK decompiled, you can extract their serial library:
+
+```bash
+# If you still have the decompiled Sportstech app:
+# Look for: libmid_serial.so in the lib/ folder
+# Or use the android-serialport-api.jar bundled with it
+
+# Copy to your project:
+cp /path/to/sportstech/lib/android-serialport-api.jar /home/martin/dev/clean-row/app/libs/
 ```
 
 ## Build Steps
@@ -25,6 +38,17 @@ cd android-serialport-api
 Once the JAR is in place:
 
 ```bash
+cd /home/martin/dev/clean-row
+
+# Install Gradle wrapper (first time only)
+# If you don't have gradle installed globally, download it:
+# wget https://services.gradle.org/distributions/gradle-8.2-bin.zip
+# unzip gradle-8.2-bin.zip
+# ./gradle-8.2/bin/gradle wrapper
+
+# Or if gradle is available:
+gradle wrapper
+
 # Build the APK
 ./gradlew assembleDebug
 ```
@@ -32,8 +56,8 @@ Once the JAR is in place:
 ## Install on Rowing Machine
 
 ```bash
-# Connect to your rowing machine via WiFi debugging
-adb connect <ROWING_MACHINE_IP>:<PORT>
+# Connect to your S-Row via WiFi debugging
+adb connect 192.168.178.40:PORT
 
 # Install
 adb install app/build/outputs/apk/debug/app-debug.apk
@@ -68,13 +92,11 @@ Make sure your dev machine and rowing machine are on the same network.
 
 ### Build fails with "SerialPort not found"
 
-The android-serialport-api.jar is missing or invalid. See the library section
-above.
+The android-serialport-api.jar is missing or invalid. See the library section above.
 
 ### Can't connect via ADB
 
-Ensure wireless debugging is enabled on the rowing machine. The connection port
-changes on reboot, so you may need to re-pair.
+Ensure wireless debugging is enabled on the S-Row. The connection port changes on reboot, so you may need to re-pair.
 
 ### Web page doesn't load
 

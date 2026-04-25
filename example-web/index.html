@@ -165,6 +165,10 @@
         
         <div class="stats">
             <div class="stat-card">
+                <div class="stat-label">RPM</div>
+                <div class="stat-value" id="rpm">0</div>
+            </div>
+            <div class="stat-card">
                 <div class="stat-label">Power</div>
                 <div class="stat-value" id="watts">0<span class="stat-unit">W</span></div>
             </div>
@@ -226,10 +230,6 @@
                     <button onclick="clearCounter()">Clear Counter</button>
                     <button onclick="pauseWorkout()">Pause</button>
                     <button onclick="resumeWorkout()">Resume</button>
-                    <button onclick="toggleDisplay()">Toggle Display</button>
-                    <button onclick="reloadPage()">Reload Page</button>
-                    <button onclick="closeApp()">Close App</button>
-                    <button onclick="restartApp()">Restart App</button>
                 </div>
             </div>
         </div>
@@ -296,34 +296,6 @@
             cleanRowBridge.postMessage({
                 type: 'command',
                 action: 'resume'
-            });
-        }
-
-        function reloadPage() {
-            cleanRowBridge.postMessage({
-                type: 'command',
-                action: 'reload'
-            });
-        }
-
-        function closeApp() {
-            cleanRowBridge.postMessage({
-                type: 'command',
-                action: 'closeApp'
-            });
-        }
-
-        function restartApp() {
-            cleanRowBridge.postMessage({
-                type: 'command',
-                action: 'restartApp'
-            });
-        }
-
-        function toggleDisplay() {
-            cleanRowBridge.postMessage({
-                type: 'command',
-                action: 'toggleDisplay'
             });
         }
         

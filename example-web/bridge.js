@@ -6,9 +6,9 @@
  */
 
 // Bridge interface for posting messages to native Android
-const cleanRowBridge = (function () {
+const cleanRowBridge = (function() {
     const isAndroid = typeof window.cleanRowBridge !== 'undefined';
-
+    
     if (isAndroid) {
         // Use the native WebMessageListener interface
         return {
@@ -34,13 +34,14 @@ const cleanRowBridge = (function () {
 window.addEventListener('rowingData', (event) => {
     const data = event.detail;
     console.log('Rowing data:', data);
-
+    
     // Update UI elements
+    document.getElementById('rpm').textContent = data.rpm;
     document.getElementById('watts').textContent = data.watts;
     document.getElementById('spm').textContent = data.spm;
     document.getElementById('strokes').textContent = data.strokeCount;
     document.getElementById('drag').textContent = data.drag;
-
+    
     // You can add custom logic here, e.g.:
     // - Update charts
     // - Calculate pace
@@ -54,7 +55,7 @@ window.addEventListener('rowingData', (event) => {
 window.addEventListener('connectionStatus', (event) => {
     const status = event.detail;
     console.log('Connection status:', status);
-
+    
     const statusEl = document.getElementById('status');
     if (status.connected) {
         statusEl.textContent = 'Connected to rowing machine';
@@ -71,7 +72,7 @@ window.addEventListener('connectionStatus', (event) => {
 window.addEventListener('buttonPress', (event) => {
     const buttonData = event.detail;
     console.log('Button pressed:', buttonData);
-
+    
     if (buttonData.type === 'shortPress') {
         // Handle short press (e.g., pause/resume)
         console.log('Short press detected');
@@ -97,7 +98,7 @@ const CleanRowAPI = {
             value: level
         });
     },
-
+    
     /**
      * Set target wattage.
      * @param {number} watts - Target power output 0-500W
@@ -109,7 +110,7 @@ const CleanRowAPI = {
             value: watts
         });
     },
-
+    
     /**
      * Set LED RGB color.
      * @param {number} r - Red 0-255
@@ -125,7 +126,7 @@ const CleanRowAPI = {
             b: b
         });
     },
-
+    
     /**
      * Set LED preset color.
      * @param {number} preset - Preset ID: 0=off, 1=blue, 2=cyan, 3=green, 
@@ -138,7 +139,7 @@ const CleanRowAPI = {
             value: preset
         });
     },
-
+    
     /**
      * Clear the stroke counter.
      */
@@ -148,7 +149,7 @@ const CleanRowAPI = {
             action: 'clearCounter'
         });
     },
-
+    
     /**
      * Pause workout polling (stops receiving updates).
      */
@@ -158,7 +159,7 @@ const CleanRowAPI = {
             action: 'pause'
         });
     },
-
+    
     /**
      * Resume workout polling.
      */
@@ -166,47 +167,6 @@ const CleanRowAPI = {
         cleanRowBridge.postMessage({
             type: 'command',
             action: 'resume'
-        });
-    },
-
-    /**
-     * Reload the currently loaded web page inside the app WebView.
-     */
-    reload() {
-        cleanRowBridge.postMessage({
-            type: 'command',
-            action: 'reload'
-        });
-    },
-
-    /**
-     * Close the app activity.
-     */
-    closeApp() {
-        cleanRowBridge.postMessage({
-            type: 'command',
-            action: 'closeApp'
-        });
-    },
-
-    /**
-     * Restart the app process.
-     */
-    restartApp() {
-        cleanRowBridge.postMessage({
-            type: 'command',
-            action: 'restartApp'
-        });
-    },
-
-    /**
-     * Toggle the display on/off (dims or restores brightness).
-     * When dimmed, press any volume button to wake the screen.
-     */
-    toggleDisplay() {
-        cleanRowBridge.postMessage({
-            type: 'command',
-            action: 'toggleDisplay'
         });
     }
 };
